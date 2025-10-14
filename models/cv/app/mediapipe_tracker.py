@@ -3,6 +3,7 @@ import numpy as np
 import mediapipe as mp
 import time
 from typing import Tuple, List, Optional
+from pyzbar import pyzbar
 
 
 class MediaPipePersonTracker:
@@ -57,6 +58,43 @@ class MediaPipePersonTracker:
         
         print(f"Camera {self.camera_index} initialized successfully!")
     
+    def detect_qr_codes(self, frame) -> Tuple[np.ndarray, List[str]]:
+        """
+        Detect QR codes in the frame.
+        
+        Args:
+            frame: Input frame from camera
+            
+        Returns:
+            tuple: (frame_with_qr_detections, qr_data_list)
+        """
+        # Convert frame to grayscale for QR code detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # Detect QR codes
+        qr_codes = pyzbar.decode(gray)
+        
+        qr_data_list = []
+        annotated_frame = frame.copy()
+        
+        for qr_code in qr_codes:
+            # Extract QR code data
+            qr_data = qr_code.data.decode('utf-8')
+            qr_data_list.append(qr_data)
+            
+            # Get QR code location
+            rect = qr_code.rect
+            x, y, w, h = rect.left, rect.top, rect.width, rect.height
+            
+            # Draw rectangle around QR code
+            cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            
+            # Draw QR code data as text
+            cv2.putText(annotated_frame, qr_data, (x, y - 10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+        
+        return annotated_frame, qr_data_list
+
     def detect_persons(self, frame) -> Tuple[np.ndarray, int]:
         """
         Detect persons in the frame using MediaPipe Objectron.
@@ -157,7 +195,7 @@ class MediaPipePersonTracker:
             print(f"Error processing frame: {e}")
             return frame, 0, 0
     
-    def draw_info_overlay(self, frame, person_count, pose_count, fps):
+    def draw_info_overlay(self, frame, person_count, pose_count, fps, qr_count=0):
         """
         Draw information overlay on the frame.
         
@@ -166,19 +204,22 @@ class MediaPipePersonTracker:
             person_count: Number of persons detected
             pose_count: Number of poses detected
             fps: Current FPS
+            qr_count: Number of QR codes detected
         """
         # Background rectangle for text
-        cv2.rectangle(frame, (10, 10), (300, 120), (0, 0, 0), -1)
-        cv2.rectangle(frame, (10, 10), (300, 120), (255, 255, 255), 2)
+        cv2.rectangle(frame, (10, 10), (300, 140), (0, 0, 0), -1)
+        cv2.rectangle(frame, (10, 10), (300, 140), (255, 255, 255), 2)
         
         # Add text information
         cv2.putText(frame, f"Persons detected: {person_count}", (20, 35), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
         cv2.putText(frame, f"Poses detected: {pose_count}", (20, 60), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 255), 2)
-        cv2.putText(frame, f"FPS: {fps:.1f}", (20, 85), 
+        cv2.putText(frame, f"QR codes detected: {qr_count}", (20, 85), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-        cv2.putText(frame, "Press 'q' to quit, 's' to save", (20, 110), 
+        cv2.putText(frame, f"FPS: {fps:.1f}", (20, 110), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+        cv2.putText(frame, "Press 'q' to quit, 's' to save", (20, 135), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
     
     def run_tracking(self):
@@ -189,6 +230,7 @@ class MediaPipePersonTracker:
             print("Starting person tracking with MediaPipe...")
             print("Press 'q' to quit, 's' to save current frame")
             print("Press 'p' to toggle pose detection, 'o' to toggle object detection")
+            print("QR code with 'exit' - Quit the application")
             
             frame_count = 0
             start_time = time.time()
@@ -201,17 +243,25 @@ class MediaPipePersonTracker:
                     print("Failed to read frame from camera")
                     break
                 
+                # Detect QR codes first
+                qr_frame, qr_data_list = self.detect_qr_codes(frame)
+                
+                # Check for exit QR code
+                if "exit" in qr_data_list:
+                    print("\nExit QR code detected! Quitting application...")
+                    break
+                
                 # Process the frame based on current settings
                 if show_objects and show_pose:
-                    processed_frame, person_count, pose_count = self.process_frame(frame)
+                    processed_frame, person_count, pose_count = self.process_frame(qr_frame)
                 elif show_objects:
-                    processed_frame, person_count, pose_count = self.detect_persons(frame)
+                    processed_frame, person_count, pose_count = self.detect_persons(qr_frame)
                     pose_count = 0
                 elif show_pose:
-                    processed_frame, person_count, pose_count = self.detect_pose(frame)
+                    processed_frame, person_count, pose_count = self.detect_pose(qr_frame)
                     person_count = 0
                 else:
-                    processed_frame = frame
+                    processed_frame = qr_frame
                     person_count = pose_count = 0
                 
                 # Calculate FPS
@@ -223,7 +273,7 @@ class MediaPipePersonTracker:
                     fps = 0
                 
                 # Add information overlay
-                self.draw_info_overlay(processed_frame, person_count, pose_count, fps)
+                self.draw_info_overlay(processed_frame, person_count, pose_count, fps, len(qr_data_list))
                 
                 # Add mode indicators
                 mode_text = f"Objects: {'ON' if show_objects else 'OFF'} | Pose: {'ON' if show_pose else 'OFF'}"

@@ -10,4 +10,7 @@ dependencies = [
     "numpy",
     "pillow",
     "ultralytics>=8.3.214",
+    "pyzbar>=0.1.9",
+    "opencv-contrib-python>=4.11.0.86",
+    "qrcode[pil]>=8.2",
 ]

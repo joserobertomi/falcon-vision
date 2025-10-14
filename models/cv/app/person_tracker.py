@@ -1,8 +1,9 @@
 import cv2
 import numpy as np
 import time
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 from ultralytics import YOLO
+from pyzbar import pyzbar
 
 
 class PersonDetector:
@@ -41,6 +42,43 @@ class PersonDetector:
         
         print(f"Camera {self.camera_index} initialized successfully!")
     
+    def detect_qr_codes(self, frame) -> Tuple[np.ndarray, List[str]]:
+        """
+        Detect QR codes in the frame.
+        
+        Args:
+            frame: Input frame from camera
+            
+        Returns:
+            tuple: (frame_with_qr_detections, qr_data_list)
+        """
+        # Convert frame to grayscale for QR code detection
+        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+        
+        # Detect QR codes
+        qr_codes = pyzbar.decode(gray)
+        
+        qr_data_list = []
+        annotated_frame = frame.copy()
+        
+        for qr_code in qr_codes:
+            # Extract QR code data
+            qr_data = qr_code.data.decode('utf-8')
+            qr_data_list.append(qr_data)
+            
+            # Get QR code location
+            rect = qr_code.rect
+            x, y, w, h = rect.left, rect.top, rect.width, rect.height
+            
+            # Draw rectangle around QR code
+            cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            
+            # Draw QR code data as text
+            cv2.putText(annotated_frame, qr_data, (x, y - 10), 
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+        
+        return annotated_frame, qr_data_list
+
     def detect_persons(self, frame) -> Tuple[np.ndarray, int, List]:
         """
         Detect persons in the frame using YOLOv8.
@@ -97,7 +135,7 @@ class PersonDetector:
         
         return annotated_frame, person_count, detections_info
     
-    def draw_info_overlay(self, frame, person_count, fps, avg_confidence=None):
+    def draw_info_overlay(self, frame, person_count, fps, avg_confidence=None, qr_count=0):
         """
         Draw information overlay on the frame.
         
@@ -106,24 +144,27 @@ class PersonDetector:
             person_count: Number of persons detected
             fps: Current FPS
             avg_confidence: Average confidence of detections
+            qr_count: Number of QR codes detected
         """
         # Background rectangle for text
-        overlay_height = 140 if avg_confidence else 120
+        overlay_height = 160 if avg_confidence else 140
         cv2.rectangle(frame, (10, 10), (300, overlay_height), (0, 0, 0), -1)
         cv2.rectangle(frame, (10, 10), (300, overlay_height), (255, 255, 255), 2)
         
         # Add text information
         cv2.putText(frame, f"Persons detected: {person_count}", (20, 35), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        cv2.putText(frame, f"FPS: {fps:.1f}", (20, 60), 
+        cv2.putText(frame, f"QR codes detected: {qr_count}", (20, 60), 
+                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+        cv2.putText(frame, f"FPS: {fps:.1f}", (20, 85), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
         
         if avg_confidence is not None:
-            cv2.putText(frame, f"Avg Confidence: {avg_confidence:.2f}", (20, 85), 
+            cv2.putText(frame, f"Avg Confidence: {avg_confidence:.2f}", (20, 110), 
                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
-            y_pos = 110
+            y_pos = 135
         else:
-            y_pos = 85
+            y_pos = 110
         
         cv2.putText(frame, "Press 'q' to quit, 's' to save", (20, y_pos), 
                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
@@ -138,6 +179,7 @@ class PersonDetector:
             print("Controls:")
             print("  'q' - Quit the application")
             print("  's' - Save current frame")
+            print("  QR code with 'exit' - Quit the application")
             print("=" * 50)
             
             frame_count = 0
@@ -150,8 +192,16 @@ class PersonDetector:
                     print("Failed to read frame from camera")
                     break
                 
+                # Detect QR codes first
+                qr_frame, qr_data_list = self.detect_qr_codes(frame)
+                
+                # Check for exit QR code
+                if "exit" in qr_data_list:
+                    print("\nExit QR code detected! Quitting application...")
+                    break
+                
                 # Detect persons in the frame
-                processed_frame, person_count, detections_info = self.detect_persons(frame)
+                processed_frame, person_count, detections_info = self.detect_persons(qr_frame)
                 
                 # Calculate average confidence
                 avg_confidence = None
@@ -165,7 +215,7 @@ class PersonDetector:
                     fps = frame_count / elapsed_time
                 
                 # Add information overlay
-                self.draw_info_overlay(processed_frame, person_count, fps, avg_confidence)
+                self.draw_info_overlay(processed_frame, person_count, fps, avg_confidence, len(qr_data_list))
                 
                 # Display the frame
                 cv2.imshow('YOLOv8 Person Detection', processed_frame)
