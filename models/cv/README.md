@@ -1,71 +1,120 @@
-# Person Tracking Application with Ikomia
+# MediaPipe Person Tracking Application
 
-A Python application that uses your camera to track people in real-time using the Ikomia computer vision platform.
+A real-time person tracking application using MediaPipe for computer vision tasks. This application provides both person detection and human pose estimation capabilities.
 
 ## Features
 
-- Real-time person detection and tracking using Ikomia's YOLO v9 algorithm
-- Live camera feed with bounding boxes around detected persons
-- FPS counter and detection statistics
-- Save current frame functionality
-- Configurable confidence threshold
-- Clean, object-oriented code structure
+- **Real-time Person Detection**: Uses MediaPipe Objectron for detecting persons in the camera feed
+- **Human Pose Estimation**: Uses MediaPipe Pose for detecting and tracking human pose landmarks
+- **Interactive Controls**: Toggle between different detection modes during runtime
+- **Performance Monitoring**: Real-time FPS display
+- **Frame Saving**: Save current frames as images
+- **Configurable Confidence**: Adjustable detection confidence thresholds
 
 ## Installation
 
-1. Make sure you have Python 3.10+ installed
-2. Install the required dependencies:
+1. **Install Dependencies**:
+   ```bash
+   # Install using pip
+   pip install mediapipe opencv-python numpy pillow
+   
+   # Or install from pyproject.toml
+   pip install -e .
+   ```
 
-```bash
-pip install ikomia opencv-python numpy pillow
-```
-
-Or install from the project:
-
-```bash
-pip install -e .
-```
+2. **Camera Setup**:
+   - Ensure your camera is connected and accessible
+   - Grant camera permissions if required by your system
 
 ## Usage
 
-Run the application:
+### Quick Start
 
 ```bash
-python app/main.py
+# Run the application
+python run_tracker.py
+
+# Or run directly from the app directory
+cd app
+python main.py
 ```
 
 ### Controls
 
 - **'q'**: Quit the application
-- **'s'**: Save the current frame as an image
+- **'s'**: Save current frame as an image
+- **'p'**: Toggle pose detection on/off
+- **'o'**: Toggle object detection on/off
 
 ### Configuration
 
-You can modify the following parameters in the `main()` function:
+You can modify the tracking parameters in `main.py`:
 
-- `camera_index`: Camera device index (default: 0)
-- `confidence_threshold`: Minimum confidence for person detection (default: 0.5)
+```python
+tracker = MediaPipePersonTracker(
+    camera_index=0,           # Camera device index
+    confidence_threshold=0.5  # Detection confidence threshold (0.0-1.0)
+)
+```
 
-## Requirements
+## Application Structure
 
-- A working camera connected to your system
-- Ikomia platform access
-- Python 3.10 or higher
+```
+models/cv/
+├── app/
+│   ├── main.py                 # Main application entry point
+│   └── mediapipe_tracker.py    # MediaPipe tracker implementation
+├── run_tracker.py              # Simple launcher script
+├── pyproject.toml              # Project dependencies
+└── README.md                   # This file
+```
+
+## Technical Details
+
+### MediaPipe Solutions Used
+
+1. **Objectron**: For person detection and 3D bounding box estimation
+2. **Pose**: For human pose landmark detection and tracking
+
+### Performance
+
+- Optimized for real-time performance
+- Configurable model complexity
+- Efficient frame processing pipeline
+- FPS monitoring and display
+
+### Requirements
+
+- Python 3.10+
+- MediaPipe
+- OpenCV
+- NumPy
+- Pillow
+- Camera device
 
 ## Troubleshooting
 
-If you encounter issues:
+### Common Issues
 
-1. **Camera not found**: Make sure your camera is connected and not being used by another application
-2. **Ikomia errors**: Ensure Ikomia is properly installed and you have internet access for model downloads
-3. **Performance issues**: Try reducing the input size or confidence threshold in the algorithm parameters
+1. **Camera not found**:
+   - Check if camera is connected
+   - Try different camera indices (0, 1, 2, etc.)
+   - Ensure camera permissions are granted
 
-## Algorithm Details
+2. **Low FPS**:
+   - Reduce camera resolution in the code
+   - Lower the confidence threshold
+   - Close other applications using the camera
 
-This application uses Ikomia's YOLO v9 algorithm for person detection, which provides:
-- High accuracy person detection
-- Real-time performance
-- Configurable confidence thresholds
-- Bounding box visualization
+3. **Installation issues**:
+   - Ensure Python 3.10+ is installed
+   - Use a virtual environment
+   - Check MediaPipe installation: `pip show mediapipe`
 
-The algorithm is automatically downloaded on first use and cached for subsequent runs.
+### Debug Mode
+
+To run with verbose output, modify the confidence threshold or add debug prints in the tracker class.
+
+## License
+
+This project is part of the Falcon Vision system.
