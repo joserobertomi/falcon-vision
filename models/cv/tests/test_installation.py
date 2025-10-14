@@ -6,6 +6,8 @@ Test script to verify MediaPipe installation and basic functionality
 import sys
 import os
 
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
+
 def test_imports():
     """Test if all required modules can be imported."""
     print("Testing imports...")
@@ -107,7 +109,7 @@ def test_tracker_import():
         # Add app directory to path
         sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'app'))
         
-        from mediapipe_tracker import MediaPipePersonTracker
+        from app.mediapipe_tracker import MediaPipePersonTracker
         print("✓ MediaPipePersonTracker imported successfully")
         
         # Test instantiation (without camera)
