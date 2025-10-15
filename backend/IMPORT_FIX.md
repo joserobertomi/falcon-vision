@@ -104,7 +104,7 @@ cd backend
 uv run uvicorn app.api.main:app --reload
 
 # Terminal 2: Frontend
-cd beta-frontend
+cd ui
 streamlit run app/pages/camera.py
 ```
 

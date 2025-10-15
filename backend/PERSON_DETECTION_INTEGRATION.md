@@ -263,7 +263,7 @@ detection_config = {
 
 2. **Start Frontend:**
    ```bash
-   cd beta-frontend
+   cd ui
    streamlit run app/pages/camera.py
    ```
 

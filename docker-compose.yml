@@ -163,15 +163,15 @@ services:
       # Enable redirection for HTTP and HTTPS
       - traefik.http.routers.${STACK_NAME?Variable not set}-frontend-http.middlewares=https-redirect
 
-  beta-frontend:
-      image: "${DOCKER_IMAGE_BETA_FRONTEND?Variable not set}:${TAG-latest}"
+  ui:
+      image: "${DOCKER_IMAGE_UI?Variable not set}:${TAG-latest}"
       restart: always
       networks:
         - traefik-public
         - default
 
       build:
-        context: ./beta-frontend
+        context: ./ui
         dockerfile: Dockerfile
 
       env_file:
@@ -182,18 +182,18 @@ services:
         - traefik.docker.network=traefik-public
         - traefik.constraint-label=traefik-public
 
-        - traefik.http.services.${STACK_NAME?Variable not set}-beta-frontend.loadbalancer.server.port=5174
+        - traefik.http.services.${STACK_NAME?Variable not set}-ui.loadbalancer.server.port=5174
 
-        - traefik.http.routers.${STACK_NAME?Variable not set}-beta-frontend-http.rule=Host(`beta.${DOMAIN?Variable not set}`)
-        - traefik.http.routers.${STACK_NAME?Variable not set}-beta-frontend-http.entrypoints=http
+        - traefik.http.routers.${STACK_NAME?Variable not set}-ui-http.rule=Host(`beta.${DOMAIN?Variable not set}`)
+        - traefik.http.routers.${STACK_NAME?Variable not set}-ui-http.entrypoints=http
 
-        - traefik.http.routers.${STACK_NAME?Variable not set}-beta-frontend-https.rule=Host(`beta.${DOMAIN?Variable not set}`)
-        - traefik.http.routers.${STACK_NAME?Variable not set}-beta-frontend-https.entrypoints=https
-        - traefik.http.routers.${STACK_NAME?Variable not set}-beta-frontend-https.tls=true
-        - traefik.http.routers.${STACK_NAME?Variable not set}-beta-frontend-https.tls.certresolver=le
+        - traefik.http.routers.${STACK_NAME?Variable not set}-ui-https.rule=Host(`beta.${DOMAIN?Variable not set}`)
+        - traefik.http.routers.${STACK_NAME?Variable not set}-ui-https.entrypoints=https
+        - traefik.http.routers.${STACK_NAME?Variable not set}-ui-https.tls=true
+        - traefik.http.routers.${STACK_NAME?Variable not set}-ui-https.tls.certresolver=le
 
         # Redirect HTTP → HTTPS
-        - traefik.http.routers.${STACK_NAME?Variable not set}-beta-frontend-http.middlewares=https-redirect
+        - traefik.http.routers.${STACK_NAME?Variable not set}-ui-http.middlewares=https-redirect
 
 volumes:
   app-db-data:

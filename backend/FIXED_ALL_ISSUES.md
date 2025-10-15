@@ -133,7 +133,7 @@ uv run uvicorn app.main:app --reload --host 0.0.0.0 --port 8000
 
 ### Start the Frontend
 ```bash
-cd beta-frontend
+cd ui
 streamlit run app/pages/camera.py
 ```
 
@@ -313,7 +313,7 @@ Your system is now fully functional! Here's what you can do:
    cd backend && uv run uvicorn app.main:app --reload
    
    # Terminal 2
-   cd beta-frontend && streamlit run app/pages/camera.py
+   cd ui && streamlit run app/pages/camera.py
    ```
 
 2. **Get JWT token**: Use `/api/v1/login/access-token`

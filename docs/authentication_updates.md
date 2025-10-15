@@ -37,7 +37,7 @@ from app.core.db import engine
 from app.models import TokenPayload, User
 ```
 
-### 2. Frontend Changes (`beta-frontend/app/pages/camera.py`)
+### 2. Frontend Changes (`ui/app/pages/camera.py`)
 
 #### Added Authentication UI
 - JWT token input field (password-protected)
@@ -185,7 +185,7 @@ ws.onclose = (event) => {
 
 2. Start the Streamlit frontend:
    ```bash
-   cd beta-frontend
+   cd ui
    streamlit run app/main.py
    ```
 

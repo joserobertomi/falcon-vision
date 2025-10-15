@@ -65,7 +65,7 @@ print(f"Your token: {token}")
 
 1. Start Streamlit:
    ```bash
-   cd beta-frontend
+   cd ui
    streamlit run app/main.py
    ```
 

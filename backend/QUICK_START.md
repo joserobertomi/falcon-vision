@@ -25,7 +25,7 @@ INFO: Uvicorn running on http://0.0.0.0:8000
 
 ### 3. Start Frontend
 ```bash
-cd beta-frontend
+cd ui
 streamlit run app/pages/camera.py
 ```
 
