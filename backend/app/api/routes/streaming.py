@@ -1,9 +1,9 @@
 import asyncio
 import logging
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
-from jwt.exceptions import InvalidTokenError
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
+from app.api.deps import CurrentUserWS
 from app.connection_manager import manager
 
 
@@ -16,7 +16,7 @@ router = APIRouter(prefix="/ws", tags=["video-streaming"])
 @router.websocket("/video")
 async def video_stream_endpoint(
     websocket: WebSocket,
-    token: str = Query(..., description="JWT access token for authentication")
+    current_user: CurrentUserWS
 ) -> None:
     """
     WebSocket endpoint for authenticated video streaming.
@@ -30,7 +30,7 @@ async def video_stream_endpoint(
     
     Args:
         websocket: The WebSocket connection
-        token: JWT access token for authentication (query parameter)
+        current_user: Authenticated user (injected via dependency)
         
     Protocol:
         - Binary messages: Video frames (JPEG, PNG, or raw frame data)
@@ -71,14 +71,8 @@ async def video_stream_endpoint(
         The token must be a valid JWT access token obtained from the /login/access-token endpoint.
         If authentication fails, the connection will be closed with code 1008 (Policy Violation).
     """
-    # Authenticate user before accepting connection
-    try:
-        current_user = await manager.get_current_user_ws(token)
-        client_id = str(current_user.id)
-    except (InvalidTokenError, ValueError) as e:
-        logger.warning(f"WebSocket authentication failed: {e}")
-        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication failed")
-        return
+    # User is already authenticated via dependency injection
+    client_id = str(current_user.id)
     
     await manager.connect(websocket, client_id)
     
