@@ -1,9 +1,11 @@
 import cv2
 import numpy as np
 import logging
-from typing import Tuple, List, Optional
+from typing import Tuple, List, Optional, Dict
 from ultralytics import YOLO
 from pyzbar import pyzbar
+import uuid
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +50,12 @@ class FrameProcessor:
         
         # Statistics
         self.frames_processed = 0
+        
+        # Person tracking
+        self.active_persons: Dict[str, dict] = {}  # Track active persons by ID
+        self.next_person_id = 1
+        self.max_disappeared_frames = 5  # Remove person if not seen for 5 frames
+        self.start_time = time.time()  # Track overall processing start time
         
         logger.info("FrameProcessor initialized successfully!")
     
@@ -129,9 +137,108 @@ class FrameProcessor:
         
         return annotated_frame, qr_data_list
 
+    def calculate_iou(self, bbox1: Tuple[int, int, int, int], bbox2: Tuple[int, int, int, int]) -> float:
+        """
+        Calculate Intersection over Union (IoU) between two bounding boxes.
+        
+        Args:
+            bbox1: First bounding box (x1, y1, x2, y2)
+            bbox2: Second bounding box (x1, y1, x2, y2)
+            
+        Returns:
+            IoU value between 0 and 1
+        """
+        x1_1, y1_1, x2_1, y2_1 = bbox1
+        x1_2, y1_2, x2_2, y2_2 = bbox2
+        
+        # Calculate intersection area
+        x1_i = max(x1_1, x1_2)
+        y1_i = max(y1_1, y1_2)
+        x2_i = min(x2_1, x2_2)
+        y2_i = min(y2_1, y2_2)
+        
+        if x2_i <= x1_i or y2_i <= y1_i:
+            return 0.0
+        
+        intersection = (x2_i - x1_i) * (y2_i - y1_i)
+        
+        # Calculate union area
+        area1 = (x2_1 - x1_1) * (y2_1 - y1_1)
+        area2 = (x2_2 - x1_2) * (y2_2 - y1_2)
+        union = area1 + area2 - intersection
+        
+        return intersection / union if union > 0 else 0.0
+
+    def match_persons(self, current_detections: List[Tuple[int, int, int, int]]) -> List[Tuple[str, Tuple[int, int, int, int]]]:
+        """
+        Match current detections with existing tracked persons.
+        
+        Args:
+            current_detections: List of current bounding boxes
+            
+        Returns:
+            List of (person_id, bbox) tuples for matched persons
+        """
+        matched_persons = []
+        used_detections = set()
+        
+        # Try to match each existing person with current detections
+        for person_id, person_data in self.active_persons.items():
+            best_iou = 0.0
+            best_detection_idx = -1
+            
+            for i, detection_bbox in enumerate(current_detections):
+                if i in used_detections:
+                    continue
+                    
+                iou = self.calculate_iou(person_data['bbox'], detection_bbox)
+                if iou > best_iou and iou > 0.3:  # Minimum IoU threshold
+                    best_iou = iou
+                    best_detection_idx = i
+            
+            if best_detection_idx != -1:
+                # Match found
+                matched_bbox = current_detections[best_detection_idx]
+                matched_persons.append((person_id, matched_bbox))
+                used_detections.add(best_detection_idx)
+                
+                # Update person data
+                self.active_persons[person_id]['bbox'] = matched_bbox
+                self.active_persons[person_id]['last_seen'] = self.frames_processed
+                self.active_persons[person_id]['last_detection_time'] = time.time()
+        
+        # Create new persons for unmatched detections
+        for i, detection_bbox in enumerate(current_detections):
+            if i not in used_detections:
+                new_person_id = f"person_{self.next_person_id}"
+                self.next_person_id += 1
+                
+                current_time = time.time()
+                self.active_persons[new_person_id] = {
+                    'bbox': detection_bbox,
+                    'first_detected': self.frames_processed,
+                    'last_seen': self.frames_processed,
+                    'first_detection_time': current_time,
+                    'last_detection_time': current_time
+                }
+                
+                matched_persons.append((new_person_id, detection_bbox))
+        
+        # Remove persons that haven't been seen for too long
+        persons_to_remove = []
+        for person_id, person_data in self.active_persons.items():
+            if self.frames_processed - person_data.get('last_seen', 0) > self.max_disappeared_frames:
+                persons_to_remove.append(person_id)
+        
+        for person_id in persons_to_remove:
+            del self.active_persons[person_id]
+        
+        return matched_persons
+
+
     def detect_persons(self, frame: np.ndarray) -> Tuple[np.ndarray, int, List[dict]]:
         """
-        Detect persons in the frame using YOLOv8.
+        Detect persons in the frame using YOLOv8 with tracking.
         
         Args:
             frame: Input frame as numpy array
@@ -142,11 +249,10 @@ class FrameProcessor:
         # Run YOLOv8 inference
         results = self.model(frame, verbose=False)
         
-        person_count = 0
-        detections_info = []
-        annotated_frame = frame.copy()
+        # Collect all person detections
+        current_detections = []
+        detection_confidences = []
         
-        # Process results
         for result in results:
             boxes = result.boxes
             
@@ -159,31 +265,65 @@ class FrameProcessor:
                 if class_id == self.person_class_id and confidence >= self.confidence_threshold:
                     # Get bounding box coordinates
                     x1, y1, x2, y2 = map(int, box.xyxy[0])
-                    
-                    # Draw bounding box
-                    cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-                    
-                    # Draw label with confidence
-                    label = f'Person {confidence:.2f}'
-                    label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
-                    
-                    # Draw label background
-                    cv2.rectangle(annotated_frame, 
-                                (x1, y1 - label_size[1] - 10), 
-                                (x1 + label_size[0], y1), 
-                                (0, 255, 0), -1)
-                    
-                    # Draw label text
-                    cv2.putText(annotated_frame, label, (x1, y1 - 5), 
-                              cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
-                    
-                    person_count += 1
-                    detections_info.append({
-                        'bbox': (x1, y1, x2, y2),
-                        'confidence': confidence
-                    })
+                    bbox = (x1, y1, x2, y2)
+                    current_detections.append(bbox)
+                    detection_confidences.append(confidence)
         
-        return annotated_frame, person_count, detections_info
+        # Match detections with existing persons or create new ones
+        matched_persons = self.match_persons(current_detections)
+        
+        # Create annotated frame and results
+        annotated_frame = frame.copy()
+        detections_info = []
+        
+        for person_id, bbox in matched_persons:
+            x1, y1, x2, y2 = bbox
+            
+            # Find confidence for this detection
+            confidence = 0.0
+            for i, detection_bbox in enumerate(current_detections):
+                if detection_bbox == bbox:
+                    confidence = detection_confidences[i]
+                    break
+            
+            # Calculate elapsed time since first detection
+            person_data = self.active_persons[person_id]
+            elapsed_time = person_data['last_detection_time'] - person_data['first_detection_time']
+            
+            # Log person detection with ID, bbox, and elapsed time
+            logger.info(f"Person detected: {{'id': '{person_id}', 'bbox': {bbox}, 'elapsed_time': {elapsed_time:.2f}}}")
+            
+            # Draw bounding box
+            cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            
+            # Draw label with ID and confidence
+            label = f'{person_id} ({confidence:.2f})'
+            label_size, _ = cv2.getTextSize(label, cv2.FONT_HERSHEY_SIMPLEX, 0.6, 2)
+            
+            # Draw label background
+            cv2.rectangle(annotated_frame, 
+                        (x1, y1 - label_size[1] - 10), 
+                        (x1 + label_size[0], y1), 
+                        (0, 255, 0), -1)
+            
+            # Draw label text
+            cv2.putText(annotated_frame, label, (x1, y1 - 5), 
+                      cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 0, 0), 2)
+            
+            # Calculate elapsed time for this person
+            person_data = self.active_persons[person_id]
+            elapsed_time = person_data['last_detection_time'] - person_data['first_detection_time']
+            
+            detections_info.append({
+                'id': person_id,
+                'bbox': bbox,
+                'confidence': confidence,
+                'elapsed_time': round(elapsed_time, 2),
+                'first_detection_time': person_data['first_detection_time'],
+                'last_detection_time': person_data['last_detection_time']
+            })
+        
+        return annotated_frame, len(matched_persons), detections_info
     
     def draw_info_overlay(self, frame: np.ndarray, person_count: int, 
                           avg_confidence: Optional[float] = None, qr_count: int = 0):
@@ -196,29 +336,55 @@ class FrameProcessor:
             avg_confidence: Average confidence of detections
             qr_count: Number of QR codes detected
         """
-        # Background rectangle for text
-        overlay_height = 120 if not self.enable_qr else 140
-        cv2.rectangle(frame, (10, 10), (300, overlay_height), (0, 0, 0), -1)
-        cv2.rectangle(frame, (10, 10), (300, overlay_height), (255, 255, 255), 2)
-        
-        # Add text information
-        y_pos = 35
-        cv2.putText(frame, f"Persons detected: {person_count}", (20, y_pos), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-        
+        # Dynamically fit background rectangle to content
+        y_start = 10
+        x_start = 10
+        x_pad = 14
+        y_pad = 8
+        row_height = 18
+        num_lines = 1 + (1 if self.enable_qr else 0) + (1 if avg_confidence is not None and person_count > 0 else 0)
+        # Estimate width (max of all text lines)
+        text_labels = [f"Persons: {person_count}"]
         if self.enable_qr:
-            y_pos += 30
-            cv2.putText(frame, f"QR codes: {qr_count}", (20, y_pos), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-        
+            text_labels.append(f"QR codes: {qr_count}")
         if avg_confidence is not None and person_count > 0:
-            y_pos += 30
-            cv2.putText(frame, f"Avg Confidence: {avg_confidence:.2f}", (20, y_pos), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.6, (0, 255, 255), 2)
+            text_labels.append(f"Avg Conf: {avg_confidence:.2f}")
+        text_widths = [cv2.getTextSize(l, cv2.FONT_HERSHEY_SIMPLEX, 0.45, 1)[0][0] for l in text_labels]
+        box_width = max(text_widths)+x_pad*2
+        box_height = num_lines * row_height + y_pad*2
+
+        cv2.rectangle(
+            frame, 
+            (x_start, y_start), 
+            (x_start + box_width, y_start + box_height),
+            (0, 0, 0), -1
+        )
+        cv2.rectangle(
+            frame,
+            (x_start, y_start),
+            (x_start + box_width, y_start + box_height),
+            (255, 255, 255), 2
+        )
         
-        y_pos += 30
-        cv2.putText(frame, f"Frames: {self.frames_processed}", (20, y_pos), 
-                   cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 1)
+        # Add text information (smaller font and tighter layout)
+        y_pos = 25
+        font_scale = 0.45
+        line_spacing = 18
+        thickness = 1
+
+        cv2.putText(frame, f"Persons: {person_count}", (15, y_pos),
+                    cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 255, 0), thickness)
+
+        if self.enable_qr:
+            y_pos += line_spacing
+            cv2.putText(frame, f"QR codes: {qr_count}", (15, y_pos),
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (255, 0, 0), thickness)
+
+        if avg_confidence is not None and person_count > 0:
+            y_pos += line_spacing
+            cv2.putText(frame, f"Avg Conf: {avg_confidence:.2f}", (15, y_pos),
+                        cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 255, 255), thickness)
+        
     
     async def process_frame(self, frame_bytes: bytes) -> Tuple[Optional[bytes], dict]:
         """
@@ -270,6 +436,22 @@ class FrameProcessor:
                 "qr_codes": qr_data_list if self.enable_qr else [],
                 "frames_processed": self.frames_processed
             }
+            
+            # Log summary of detected persons with their IDs, bbox positions, and elapsed times
+            if detections_info:
+                detection_summary = []
+                for detection in detections_info:
+                    person_id = detection['id']
+                    person_data = self.active_persons[person_id]
+                    elapsed_time = person_data['last_detection_time'] - person_data['first_detection_time']
+                    
+                    detection_summary.append({
+                        'id': person_id,
+                        'bbox': detection['bbox'],
+                        'elapsed_time': round(elapsed_time, 2),
+                        'confidence': detection['confidence']
+                    })
+                logger.info(f"Frame {self.frames_processed} summary: {detection_summary}")
             
             logger.debug(f"Frame processed: {person_count} persons detected")
             
