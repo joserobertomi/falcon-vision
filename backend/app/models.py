@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime, timezone
 
 from pydantic import EmailStr
 from sqlmodel import Field, Relationship, SQLModel
@@ -111,3 +112,54 @@ class TokenPayload(SQLModel):
 class NewPassword(SQLModel):
     token: str
     new_password: str = Field(min_length=8, max_length=40)
+
+
+# Detection models for person detection tracking
+class DetectionBase(SQLModel):
+    person_id: str = Field(max_length=50, index=True)  # person_1, person_2, etc.
+    bbox_x1: int = Field(description="Bounding box x1 coordinate")
+    bbox_y1: int = Field(description="Bounding box y1 coordinate")
+    bbox_x2: int = Field(description="Bounding box x2 coordinate")
+    bbox_y2: int = Field(description="Bounding box y2 coordinate")
+    confidence: float = Field(ge=0.0, le=1.0, description="Detection confidence score")
+    elapsed_time: float = Field(ge=0.0, description="Elapsed time in seconds since first detection")
+    first_detection_time: float = Field(description="Unix timestamp of first detection")
+    last_detection_time: float = Field(description="Unix timestamp of last detection")
+
+
+# Properties to receive via API on creation
+class DetectionCreate(DetectionBase):
+    pass
+
+
+# Properties to receive via API on update, all are optional
+class DetectionUpdate(SQLModel):
+    person_id: str | None = Field(default=None, max_length=50)
+    bbox_x1: int | None = Field(default=None)
+    bbox_y1: int | None = Field(default=None)
+    bbox_x2: int | None = Field(default=None)
+    bbox_y2: int | None = Field(default=None)
+    confidence: float | None = Field(default=None, ge=0.0, le=1.0)
+    elapsed_time: float | None = Field(default=None, ge=0.0)
+    first_detection_time: float | None = Field(default=None)
+    last_detection_time: float | None = Field(default=None)
+
+
+# Database model, database table inferred from class name
+class Detection(DetectionBase, table=True):
+    id: uuid.UUID = Field(default_factory=uuid.uuid4, primary_key=True)
+    created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+    updated_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
+
+
+# Properties to return via API, id is always required
+class DetectionPublic(DetectionBase):
+    id: uuid.UUID
+    created_at: datetime
+    updated_at: datetime
+
+
+class DetectionsPublic(SQLModel):
+    data: list[DetectionPublic]
+    count: int
+
