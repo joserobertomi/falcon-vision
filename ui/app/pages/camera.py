@@ -76,10 +76,13 @@ def main():
     
     # API Settings
     st.header("API Settings")
+    # Get API URL from environment variable or use default
+    import os
+    default_api_url = os.getenv("API_BASE_URL", "http://localhost:8000")
     base_url = st.text_input(
         "API Base URL:",
-        value="http://localhost:8000",
-        placeholder="http://localhost:8000",
+        value=default_api_url,
+        placeholder=default_api_url,
         help="Base URL of your FastAPI backend"
     )
     
@@ -87,7 +90,7 @@ def main():
     base_url = base_url.rstrip('/')
     
     # WebSocket URL (derived from base_url)
-    ws_url = base_url.replace('http://', 'ws://').replace('https://', 'wss://') + '/api/v1/ws/video'
+    ws_url = base_url.replace('http://', 'ws://').replace('https://', 'wss://').replace('backend', 'localhost') + '/api/v1/ws/video'
     
     st.divider()
     

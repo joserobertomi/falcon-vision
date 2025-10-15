@@ -8,7 +8,8 @@ def main():
     st.write("Create your account to access the FastCV application")
     
     # Backend API configuration
-    API_BASE_URL = "http://localhost:8000/api/v1"
+    import os
+    API_BASE_URL = os.getenv("API_BASE_URL", "http://localhost:8000") + "/api/v1"
     
     # Create signup form
     with st.form("signup_form"):
@@ -113,7 +114,7 @@ def main():
                                 st.error(f"Response: {response.text}")
                                 
                     except requests.exceptions.ConnectionError:
-                        st.error("❌ Cannot connect to the server. Please make sure the backend is running on http://localhost:8000")
+                        st.error(f"❌ Cannot connect to the server. Please make sure the backend is running on {API_BASE_URL.replace('/api/v1', '')}")
                     except requests.exceptions.Timeout:
                         st.error("❌ Request timed out. Please try again.")
                     except Exception as e:
