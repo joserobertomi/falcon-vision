@@ -6,6 +6,10 @@ from ultralytics import YOLO
 from pyzbar import pyzbar
 import uuid
 import time
+from sqlmodel import Session
+
+from app.models import DetectionCreate
+from app.crud import create_detection
 
 logger = logging.getLogger(__name__)
 
@@ -18,13 +22,24 @@ class FrameProcessor:
     without requiring camera initialization. It's designed for WebSocket streaming
     where frames are received from clients.
     
+    Features:
+    - Person detection with tracking
+    - QR code detection (optional)
+    - Automatic database persistence every 5 seconds per tracked person
+    
     Example usage in WebSocket endpoint:
         ```python
         from app.cv_model.frame_processor import get_frame_processor
+        from app.api.deps import get_db
         
         processor = get_frame_processor()
         
-        # When frame is received
+        # When frame is received (with database persistence)
+        session = next(get_db())
+        processed_frame, results = await processor.process_frame(frame_bytes, session=session)
+        await websocket.send_bytes(processed_frame)
+        
+        # Without database persistence
         processed_frame, results = await processor.process_frame(frame_bytes)
         await websocket.send_bytes(processed_frame)
         ```
@@ -56,6 +71,10 @@ class FrameProcessor:
         self.next_person_id = 1
         self.max_disappeared_frames = 5  # Remove person if not seen for 5 frames
         self.start_time = time.time()  # Track overall processing start time
+        
+        # Database persistence tracking
+        self.last_db_save: Dict[str, float] = {}  # Track last DB save time for each person
+        self.db_save_interval = 5.0  # Save to DB every 5 seconds
         
         logger.info("FrameProcessor initialized successfully!")
     
@@ -232,6 +251,9 @@ class FrameProcessor:
         
         for person_id in persons_to_remove:
             del self.active_persons[person_id]
+            # Also clean up DB save tracking
+            if person_id in self.last_db_save:
+                del self.last_db_save[person_id]
         
         return matched_persons
 
@@ -325,6 +347,57 @@ class FrameProcessor:
         
         return annotated_frame, len(matched_persons), detections_info
     
+    def save_detections_to_db(self, detections_info: List[dict], session: Session) -> int:
+        """
+        Save detections to database if enough time has elapsed since last save.
+        
+        Args:
+            detections_info: List of detection information dictionaries
+            session: Database session for persistence
+            
+        Returns:
+            Number of detections saved to database
+        """
+        saved_count = 0
+        current_time = time.time()
+        
+        for detection in detections_info:
+            person_id = detection['id']
+            last_save_time = self.last_db_save.get(person_id, 0)
+            
+            # Check if 5 seconds have elapsed since last save
+            if current_time - last_save_time >= self.db_save_interval:
+                try:
+                    # Extract bbox coordinates
+                    x1, y1, x2, y2 = detection['bbox']
+                    
+                    # Create detection record
+                    detection_create = DetectionCreate(
+                        person_id=person_id,
+                        bbox_x1=x1,
+                        bbox_y1=y1,
+                        bbox_x2=x2,
+                        bbox_y2=y2,
+                        confidence=detection['confidence'],
+                        elapsed_time=detection['elapsed_time'],
+                        first_detection_time=detection['first_detection_time'],
+                        last_detection_time=detection['last_detection_time']
+                    )
+                    
+                    # Save to database
+                    create_detection(session=session, detection_in=detection_create)
+                    
+                    # Update last save time
+                    self.last_db_save[person_id] = current_time
+                    saved_count += 1
+                    
+                    logger.info(f"Saved detection for {person_id} to database (elapsed: {detection['elapsed_time']:.2f}s)")
+                    
+                except Exception as e:
+                    logger.error(f"Failed to save detection for {person_id} to database: {e}")
+        
+        return saved_count
+    
     def draw_info_overlay(self, frame: np.ndarray, person_count: int, 
                           avg_confidence: Optional[float] = None, qr_count: int = 0):
         """
@@ -386,12 +459,13 @@ class FrameProcessor:
                         cv2.FONT_HERSHEY_SIMPLEX, font_scale, (0, 255, 255), thickness)
         
     
-    async def process_frame(self, frame_bytes: bytes) -> Tuple[Optional[bytes], dict]:
+    async def process_frame(self, frame_bytes: bytes, session: Optional[Session] = None) -> Tuple[Optional[bytes], dict]:
         """
         Process a single frame with person detection.
         
         Args:
             frame_bytes: Input frame as bytes (JPEG, PNG, etc.)
+            session: Optional database session for persisting detections
             
         Returns:
             tuple: (processed_frame_bytes, results_dict)
@@ -428,13 +502,19 @@ class FrameProcessor:
             # Update statistics
             self.frames_processed += 1
             
+            # Save detections to database if session is provided
+            saved_count = 0
+            if session is not None and detections_info:
+                saved_count = self.save_detections_to_db(detections_info, session)
+            
             # Prepare results
             results = {
                 "person_count": person_count,
                 "detections": detections_info,
                 "avg_confidence": avg_confidence,
                 "qr_codes": qr_data_list if self.enable_qr else [],
-                "frames_processed": self.frames_processed
+                "frames_processed": self.frames_processed,
+                "saved_to_db": saved_count
             }
             
             # Log summary of detected persons with their IDs, bbox positions, and elapsed times

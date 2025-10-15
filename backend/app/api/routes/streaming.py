@@ -3,7 +3,7 @@ import logging
 
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
-from app.api.deps import CurrentUserWS
+from app.api.deps import CurrentUserWS, get_db
 from app.connection_manager import manager
 from app.cv_model.frame_processor import get_frame_processor
 
@@ -31,6 +31,7 @@ async def video_stream_endpoint(
         - Automatic frame annotation with bounding boxes
         - Detection confidence scores
         - Frame statistics and monitoring
+        - Automatic database persistence (every 5 seconds per tracked person)
     
     Clients can send video frames to be processed or broadcasted, and receive
     processed frames with person detection annotations from the server.
@@ -52,7 +53,7 @@ async def video_stream_endpoint(
     Server Messages:
         - Binary: Processed video frames with person detection annotations
         - JSON: Detection results when persons are detected
-          - {"type": "detection", "person_count": N, "avg_confidence": X, "detections": [...]}
+          - {"type": "detection", "person_count": N, "avg_confidence": X, "detections": [...], "saved_to_db": N}
           
     Example usage from JavaScript client:
         ```javascript
@@ -95,6 +96,10 @@ async def video_stream_endpoint(
         "enable_qr": False
     }
     
+    # Get database session for detection persistence
+    db_generator = get_db()
+    session = next(db_generator)
+    
     await manager.connect(websocket, client_id)
     
     try:
@@ -127,7 +132,7 @@ async def video_stream_endpoint(
                         confidence_threshold=detection_config["confidence_threshold"],
                         enable_qr=detection_config["enable_qr"]
                     )
-                    processed_frame, results = await processor.process_frame(frame_data)
+                    processed_frame, results = await processor.process_frame(frame_data, session=session)
                     
                     if processed_frame:
                         # Send processed frame with detection annotations back to client
@@ -139,7 +144,8 @@ async def video_stream_endpoint(
                                 "type": "detection",
                                 "person_count": results["person_count"],
                                 "avg_confidence": results.get("avg_confidence"),
-                                "detections": results.get("detections", [])
+                                "detections": results.get("detections", []),
+                                "saved_to_db": results.get("saved_to_db", 0)
                             })
                     else:
                         # If processing failed, echo original frame
@@ -224,6 +230,11 @@ async def video_stream_endpoint(
         logger.error(f"Error in WebSocket connection for {client_id}: {e}")
     finally:
         manager.disconnect(client_id)
+        # Close database session
+        try:
+            session.close()
+        except Exception as e:
+            logger.error(f"Error closing database session for {client_id}: {e}")
 
 
 @router.get("/video/connections/count")
