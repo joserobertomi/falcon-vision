@@ -5,6 +5,7 @@ from fastapi import APIRouter, WebSocket, WebSocketDisconnect, status
 
 from app.api.deps import CurrentUserWS
 from app.connection_manager import manager
+from app.cv_model.frame_processor import get_frame_processor
 
 
 logger = logging.getLogger(__name__)
@@ -19,14 +20,20 @@ async def video_stream_endpoint(
     current_user: CurrentUserWS
 ) -> None:
     """
-    WebSocket endpoint for authenticated video streaming.
+    WebSocket endpoint for authenticated video streaming with AI-powered person detection.
     
     This endpoint accepts WebSocket connections for real-time video streaming.
     Authentication is required via JWT token passed as a query parameter.
     The authenticated user's ID is used as the client identifier.
     
+    Features:
+        - Real-time person detection using YOLOv8
+        - Automatic frame annotation with bounding boxes
+        - Detection confidence scores
+        - Frame statistics and monitoring
+    
     Clients can send video frames to be processed or broadcasted, and receive
-    video frames from the server.
+    processed frames with person detection annotations from the server.
     
     Args:
         websocket: The WebSocket connection
@@ -34,10 +41,18 @@ async def video_stream_endpoint(
         
     Protocol:
         - Binary messages: Video frames (JPEG, PNG, or raw frame data)
+          - Frames are automatically processed with person detection
+          - Processed frames with bounding boxes are sent back
         - Text messages: JSON control messages
           - {"action": "ping"} - Heartbeat message
           - {"action": "status"} - Request connection status
+          - {"action": "configure", "confidence": 0.5, "enable_qr": false} - Configure detection
           - {"action": "broadcast", "data": "base64_frame"} - Broadcast frame to all clients
+        
+    Server Messages:
+        - Binary: Processed video frames with person detection annotations
+        - JSON: Detection results when persons are detected
+          - {"type": "detection", "person_count": N, "avg_confidence": X, "detections": [...]}
           
     Example usage from JavaScript client:
         ```javascript
@@ -74,6 +89,12 @@ async def video_stream_endpoint(
     # User is already authenticated via dependency injection
     client_id = str(current_user.id)
     
+    # Detection configuration (per-client settings)
+    detection_config = {
+        "confidence_threshold": 0.5,
+        "enable_qr": False
+    }
+    
     await manager.connect(websocket, client_id)
     
     try:
@@ -101,12 +122,32 @@ async def video_stream_endpoint(
                     frame_data = data["bytes"]
                     logger.debug(f"Received frame from {client_id}, size: {len(frame_data)} bytes")
                     
-                    # Here you can process the frame (e.g., run AI inference, object detection, etc.)
-                    # For now, we'll just echo it back as an example
-                    await websocket.send_bytes(frame_data)
+                    # Process frame with person detection
+                    processor = get_frame_processor(
+                        confidence_threshold=detection_config["confidence_threshold"],
+                        enable_qr=detection_config["enable_qr"]
+                    )
+                    processed_frame, results = await processor.process_frame(frame_data)
                     
-                    # Optionally broadcast to other clients
-                    # await manager.broadcast_frame(frame_data)
+                    if processed_frame:
+                        # Send processed frame with detection annotations back to client
+                        await websocket.send_bytes(processed_frame)
+                        
+                        # Send detection results as JSON (optional)
+                        if results.get("person_count", 0) > 0:
+                            await websocket.send_json({
+                                "type": "detection",
+                                "person_count": results["person_count"],
+                                "avg_confidence": results.get("avg_confidence"),
+                                "detections": results.get("detections", [])
+                            })
+                    else:
+                        # If processing failed, echo original frame
+                        await websocket.send_bytes(frame_data)
+                        logger.warning(f"Frame processing failed: {results.get('error', 'Unknown error')}")
+                    
+                    # Optionally broadcast processed frames to other clients
+                    # await manager.broadcast_frame(processed_frame if processed_frame else frame_data)
                     
                 elif "text" in data:
                     # Received a text message (control message)
@@ -123,6 +164,28 @@ async def video_stream_endpoint(
                                 "type": "status",
                                 "client_id": client_id,
                                 "active_connections": manager.get_active_connections_count()
+                            })
+                        
+                        elif action == "configure":
+                            # Update detection configuration
+                            if "confidence" in message:
+                                confidence = float(message["confidence"])
+                                if 0.0 <= confidence <= 1.0:
+                                    detection_config["confidence_threshold"] = confidence
+                                else:
+                                    await websocket.send_json({
+                                        "type": "error",
+                                        "message": "Confidence must be between 0.0 and 1.0"
+                                    })
+                                    continue
+                            
+                            if "enable_qr" in message:
+                                detection_config["enable_qr"] = bool(message["enable_qr"])
+                            
+                            await websocket.send_json({
+                                "type": "config_updated",
+                                "confidence_threshold": detection_config["confidence_threshold"],
+                                "enable_qr": detection_config["enable_qr"]
                             })
                         
                         elif action == "broadcast" and "data" in message:

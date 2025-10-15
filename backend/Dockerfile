@@ -4,6 +4,11 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app/
 
+# Install system dependencies for QR code detection (pyzbar)
+RUN apt-get update && apt-get install -y \
+    libzbar0 \
+    && rm -rf /var/lib/apt/lists/*
+
 # Install uv
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
 COPY --from=ghcr.io/astral-sh/uv:0.5.11 /uv /uvx /bin/
@@ -40,5 +45,10 @@ COPY ./tests /app/tests
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync
+
+# Remove opencv-python (with GUI) and force-reinstall opencv-python-headless
+# ultralytics installs opencv-python by default, but we need headless for Docker
+RUN uv pip uninstall opencv-python || true && \
+    uv pip install --reinstall opencv-python-headless>=4.12.0.88
 
 CMD ["fastapi", "run", "--workers", "4", "app/main.py"]
