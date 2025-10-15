@@ -7,17 +7,20 @@ def main():
     # Connection Settings
     st.header("Connection Settings")
     
-    col1, col2 = st.columns([3, 1])
-    with col1:
-        ws_url = st.text_input(
-            "WebSocket URL:",
-            value="ws://localhost:8000/api/v1/ws/video/client123",
-            placeholder="ws://localhost:8000/api/v1/ws/video/your-client-id"
-        )
+    st.info("🔐 Authentication Required: You need a valid JWT token to connect. Get your token from /api/v1/login/access-token endpoint.")
     
-    with col2:
-        st.write("")  # Spacing
-        st.write("")  # Spacing
+    ws_url = st.text_input(
+        "WebSocket URL (Base):",
+        value="ws://localhost:8000/api/v1/ws/video",
+        placeholder="ws://localhost:8000/api/v1/ws/video"
+    )
+    
+    token = st.text_input(
+        "JWT Access Token:",
+        type="password",
+        placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...",
+        help="Enter your JWT access token obtained from the login endpoint"
+    )
     
     # Streaming Settings
     st.subheader("Streaming Settings")
@@ -224,8 +227,10 @@ def main():
             let fpsCounter = 0;
             let lastFpsUpdate = Date.now();
 
-            const WS_URL = "{ws_url}";
+            const WS_BASE_URL = "{ws_url}";
+            const TOKEN = "{token}";
             const TARGET_FPS = {fps};
+            const WS_URL = TOKEN ? `${{WS_BASE_URL}}?token=${{encodeURIComponent(TOKEN)}}` : WS_BASE_URL;
 
             function log(message, type = 'info') {{
                 const logDiv = document.getElementById('log');
@@ -269,7 +274,13 @@ def main():
                     return;
                 }}
 
-                log(`Connecting to ${{WS_URL}}...`, 'info');
+                if (!TOKEN) {{
+                    log('ERROR: No authentication token provided. Please enter your JWT token above.', 'error');
+                    updateStatus('Authentication Required', 'disconnected');
+                    return;
+                }}
+
+                log(`Connecting to WebSocket with authentication...`, 'info');
                 updateStatus('Connecting...', 'connecting');
 
                 try {{
@@ -445,10 +456,11 @@ def main():
 
             log('WebSocket Video Streaming Test Client loaded', 'success');
             log('Instructions:', 'info');
-            log('1. Click "Connect" to establish WebSocket connection', 'info');
-            log('2. Click "Start Camera" to access your webcam', 'info');
-            log('3. Click "Start Streaming" to send video frames to the server', 'info');
-            log('4. The server will echo frames back for testing', 'info');
+            log('1. Enter your JWT access token in the field above', 'info');
+            log('2. Click "Connect" to establish authenticated WebSocket connection', 'info');
+            log('3. Click "Start Camera" to access your webcam', 'info');
+            log('4. Click "Start Streaming" to send video frames to the server', 'info');
+            log('5. The server will process and echo frames back', 'info');
         </script>
     </body>
     </html>
@@ -461,12 +473,32 @@ def main():
     st.divider()
     st.subheader("📋 Instructions")
     st.markdown("""
-    1. **Connect**: Click the "Connect" button to establish a WebSocket connection to the server
-    2. **Start Camera**: Click "Start Camera" to access your webcam (you'll need to grant permission)
-    3. **Start Streaming**: Once connected and camera is active, click "Start Streaming" to send video frames
-    4. **View Results**: The server will process and echo frames back, displayed in the "Received Frames" section
-    5. **Monitor**: Check the stats for frames sent/received and current FPS
-    6. **Test Actions**: Use "Send Ping" and "Request Status" to test JSON message communication
+    ### Getting Started
+    
+    1. **Login**: First, obtain a JWT token by logging in at `/api/v1/login/access-token`
+       - You can use the API documentation at `/docs` to test the login
+       - Or use `curl` or any HTTP client to get your token
+    
+    2. **Enter Token**: Paste your JWT token in the "JWT Access Token" field above
+    
+    3. **Connect**: Click the "Connect" button to establish an authenticated WebSocket connection
+    
+    4. **Start Camera**: Click "Start Camera" to access your webcam (you'll need to grant browser permission)
+    
+    5. **Start Streaming**: Once connected and camera is active, click "Start Streaming" to send video frames
+    
+    6. **View Results**: The server will process and echo frames back, displayed in the "Received Frames" section
+    
+    7. **Monitor**: Check the stats for frames sent/received and current FPS
+    
+    8. **Test Actions**: Use "Send Ping" and "Request Status" to test JSON message communication
+    
+    ### Example: Get JWT Token with curl
+    ```bash
+    curl -X POST "http://localhost:8000/api/v1/login/access-token" \\
+      -H "Content-Type: application/x-www-form-urlencoded" \\
+      -d "username=your-email@example.com&password=your-password"
+    ```
     
     **Note**: Make sure your backend server is running at the specified WebSocket URL.
     """)
@@ -474,20 +506,31 @@ def main():
     # Additional Information
     with st.expander("ℹ️ Technical Details"):
         st.markdown("""
+        ### Authentication
+        - **Required**: All WebSocket connections require JWT authentication
+        - **Token Format**: JWT access token obtained from login endpoint
+        - **Query Parameter**: Token is passed as `?token=YOUR_TOKEN` in the WebSocket URL
+        - **User Identification**: Your user ID is automatically used as the client identifier
+        - **Security**: Connection will be rejected if token is invalid, expired, or user is inactive
+        
         ### WebSocket Protocol
         - **Binary Messages**: Video frames are sent as JPEG blobs
         - **Text Messages**: Control messages (ping, status) are sent as JSON
         - **Bidirectional**: Server can send frames back to the client
+        - **Heartbeat**: Server sends periodic heartbeat messages to keep connection alive
         
         ### Performance Tips
         - Lower FPS for slower networks
         - Ensure good lighting for better video quality
         - Check console log for detailed connection info
+        - Monitor the stats panel for performance metrics
         
         ### Troubleshooting
+        - **Authentication Failed**: Verify your JWT token is valid and not expired
         - **Connection Failed**: Verify the backend server is running
-        - **Camera Not Working**: Check browser permissions
+        - **Camera Not Working**: Check browser permissions for camera access
         - **No Frames Received**: Check server logs for errors
+        - **Token Expired**: Get a new token from the login endpoint
         """)
 
 if __name__ == "__main__":

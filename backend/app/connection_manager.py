@@ -1,9 +1,18 @@
+import jwt
+import logging
+from jwt.exceptions import InvalidTokenError
+from pydantic import ValidationError
+from sqlmodel import Session
+
 from fastapi import WebSocket
 from fastapi.websockets import WebSocketState
 
-import logging
+from app.core import security
+from app.core.config import settings
+from app.core.db import engine
+from app.models import TokenPayload, User
 
-logger = logging.getLogger(__name__)
+logger = logging.getLogger(__name__)  ## IMPROVE LOGGING
 
 class ConnectionManager:
     """
@@ -105,6 +114,37 @@ class ConnectionManager:
     def get_active_connections_count(self) -> int:
         """Return the number of active connections."""
         return len(self.active_connections)
+    
+    async def get_current_user_ws(self, token: str) -> User:
+        """
+        Authenticate WebSocket connection using JWT token.
+        
+        Args:
+            token: JWT access token
+            
+        Returns:
+            Authenticated user
+            
+        Raises:
+            InvalidTokenError: If token is invalid or expired
+            ValueError: If user not found or inactive
+        """
+        try:
+            payload = jwt.decode(
+                token, settings.SECRET_KEY, algorithms=[security.ALGORITHM]
+            )
+            token_data = TokenPayload(**payload)
+        except (InvalidTokenError, ValidationError) as e:
+            logger.error(f"Token validation failed: {e}")
+            raise InvalidTokenError("Could not validate credentials")
+        
+        with Session(engine) as session:
+            user = session.get(User, token_data.sub)
+            if not user:
+                raise ValueError("User not found")
+            if not user.is_active:
+                raise ValueError("Inactive user")
+            return user
 
 
 # Global connection manager instance

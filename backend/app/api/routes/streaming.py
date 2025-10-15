@@ -1,29 +1,36 @@
 import asyncio
 import logging
-from typing import Optional
 
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect
-from fastapi.websockets import WebSocketState
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, Query, status
+from jwt.exceptions import InvalidTokenError
 
 from app.connection_manager import manager
+
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ws", tags=["video-streaming"])
 
 
-@router.websocket("/video/{client_id}")
-async def video_stream_endpoint(websocket: WebSocket, client_id: str) -> None:
+
+@router.websocket("/video")
+async def video_stream_endpoint(
+    websocket: WebSocket,
+    token: str = Query(..., description="JWT access token for authentication")
+) -> None:
     """
-    WebSocket endpoint for video streaming.
+    WebSocket endpoint for authenticated video streaming.
     
     This endpoint accepts WebSocket connections for real-time video streaming.
+    Authentication is required via JWT token passed as a query parameter.
+    The authenticated user's ID is used as the client identifier.
+    
     Clients can send video frames to be processed or broadcasted, and receive
     video frames from the server.
     
     Args:
         websocket: The WebSocket connection
-        client_id: Unique identifier for the client connection
+        token: JWT access token for authentication (query parameter)
         
     Protocol:
         - Binary messages: Video frames (JPEG, PNG, or raw frame data)
@@ -34,7 +41,9 @@ async def video_stream_endpoint(websocket: WebSocket, client_id: str) -> None:
           
     Example usage from JavaScript client:
         ```javascript
-        const ws = new WebSocket('ws://localhost:8000/api/v1/ws/video/client123');
+        // First, get the access token from login
+        const token = 'your-jwt-token';
+        const ws = new WebSocket(`ws://localhost:8000/api/v1/ws/video?token=${token}`);
         
         ws.onopen = () => {
             console.log('Connected');
@@ -57,7 +66,20 @@ async def video_stream_endpoint(websocket: WebSocket, client_id: str) -> None:
             ws.send(frameBlob);
         };
         ```
+        
+    Authentication:
+        The token must be a valid JWT access token obtained from the /login/access-token endpoint.
+        If authentication fails, the connection will be closed with code 1008 (Policy Violation).
     """
+    # Authenticate user before accepting connection
+    try:
+        current_user = await manager.get_current_user_ws(token)
+        client_id = str(current_user.id)
+    except (InvalidTokenError, ValueError) as e:
+        logger.warning(f"WebSocket authentication failed: {e}")
+        await websocket.close(code=status.WS_1008_POLICY_VIOLATION, reason="Authentication failed")
+        return
+    
     await manager.connect(websocket, client_id)
     
     try:
@@ -66,7 +88,8 @@ async def video_stream_endpoint(websocket: WebSocket, client_id: str) -> None:
             "type": "connection",
             "status": "connected",
             "client_id": client_id,
-            "message": "WebSocket connection established for video streaming"
+            "user_email": current_user.email,
+            "message": f"WebSocket connection established for video streaming - User: {current_user.email}"
         })
         
         while True:
