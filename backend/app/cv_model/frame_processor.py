@@ -351,6 +351,9 @@ class FrameProcessor:
         """
         Save detections to database if enough time has elapsed since last save.
         
+        Only saves detections where elapsed_time > 0 to ensure we're tracking persons
+        over time, not just instantaneous detections.
+        
         Args:
             detections_info: List of detection information dictionaries
             session: Database session for persistence
@@ -363,6 +366,13 @@ class FrameProcessor:
         
         for detection in detections_info:
             person_id = detection['id']
+            elapsed_time = detection['elapsed_time']
+            
+            # Validate: only save detections with elapsed_time > 0
+            if elapsed_time <= 0:
+                logger.debug(f"Skipping {person_id}: elapsed_time is {elapsed_time:.2f}s (must be > 0)")
+                continue
+            
             last_save_time = self.last_db_save.get(person_id, 0)
             
             # Check if 5 seconds have elapsed since last save
@@ -379,7 +389,7 @@ class FrameProcessor:
                         bbox_x2=x2,
                         bbox_y2=y2,
                         confidence=detection['confidence'],
-                        elapsed_time=detection['elapsed_time'],
+                        elapsed_time=elapsed_time,
                         first_detection_time=detection['first_detection_time'],
                         last_detection_time=detection['last_detection_time']
                     )
@@ -391,7 +401,7 @@ class FrameProcessor:
                     self.last_db_save[person_id] = current_time
                     saved_count += 1
                     
-                    logger.info(f"Saved detection for {person_id} to database (elapsed: {detection['elapsed_time']:.2f}s)")
+                    logger.info(f"Saved detection for {person_id} to database (elapsed: {elapsed_time:.2f}s)")
                     
                 except Exception as e:
                     logger.error(f"Failed to save detection for {person_id} to database: {e}")
