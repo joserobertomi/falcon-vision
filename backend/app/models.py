@@ -123,8 +123,8 @@ class DetectionBase(SQLModel):
     bbox_y2: int = Field(description="Bounding box y2 coordinate")
     confidence: float = Field(ge=0.0, le=1.0, description="Detection confidence score")
     elapsed_time: float = Field(ge=0.0, description="Elapsed time in seconds since first detection")
-    first_detection_time: float = Field(description="Unix timestamp of first detection")
-    last_detection_time: float = Field(description="Unix timestamp of last detection")
+    first_detection_time: datetime = Field(description="Datetime of first detection")
+    last_detection_time: datetime = Field(description="Datetime of last detection")
 
 
 # Properties to receive via API on creation
@@ -141,8 +141,8 @@ class DetectionUpdate(SQLModel):
     bbox_y2: int | None = Field(default=None)
     confidence: float | None = Field(default=None, ge=0.0, le=1.0)
     elapsed_time: float | None = Field(default=None, ge=0.0)
-    first_detection_time: float | None = Field(default=None)
-    last_detection_time: float | None = Field(default=None)
+    first_detection_time: datetime | None = Field(default=None)
+    last_detection_time: datetime | None = Field(default=None)
 
 
 # Database model, database table inferred from class name

@@ -1,4 +1,5 @@
 import uuid
+from datetime import datetime
 from typing import Any
 
 from sqlmodel import Session, select
@@ -105,7 +106,7 @@ def delete_detection(*, session: Session, detection_id: uuid.UUID) -> Detection 
     return db_detection
 
 
-def get_detections_by_time_range(*, session: Session, start_time: float, end_time: float) -> list[Detection]:
+def get_detections_by_time_range(*, session: Session, start_time: datetime, end_time: datetime) -> list[Detection]:
     """Get detections within a specific time range."""
     statement = select(Detection).where(
         Detection.first_detection_time >= start_time,
