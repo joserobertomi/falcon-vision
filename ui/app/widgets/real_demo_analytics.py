@@ -251,262 +251,708 @@ def real_demo_analytics():
             st.error(f"Request failed: {str(e)}")
             return None
     
-    # Create tabs for different analytics sections
+    # Create tabs for different API demonstration sections
     tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
-        "📊 Summary Stats", 
-        "👥 Person Analytics", 
-        "📈 Timeline", 
-        "🎯 Active Persons", 
-        "📊 Confidence Distribution",
-        "🔍 Detailed Queries"
+        "📊 Summary Stats API", 
+        "👥 Person Analytics API", 
+        "📈 Timeline API", 
+        "🎯 Active Persons API", 
+        "📊 Confidence Distribution API",
+        "🔍 Detailed Queries API"
     ])
     
     with tab1:
-        st.header("📊 Detection Summary Statistics")
+        st.header("📊 Detection Summary Statistics API")
+        st.write("This demonstrates the `/detections/stats/summary` endpoint")
         
-        # Get summary stats
-        summary_data = make_api_call("/detections/stats/summary")
+        # Show API request details
+        st.subheader("🔗 API Request Details")
+        col1, col2 = st.columns([1, 2])
         
-        if summary_data:
-            col1, col2, col3, col4, col5 = st.columns(5)
+        with col1:
+            st.write("**Endpoint:**")
+            st.code("GET /api/v1/detections/stats/summary")
             
-            with col1:
-                st.metric(
-                    label="Total Detections",
-                    value=summary_data.get("total_detections", 0)
-                )
+            st.write("**Headers:**")
+            st.json(headers)
             
-            with col2:
-                st.metric(
-                    label="Unique Persons",
-                    value=summary_data.get("unique_persons", 0)
-                )
+            st.write("**Authentication:**")
+            st.code("Bearer Token (JWT)")
+        
+        with col2:
+            st.write("**Request URL:**")
+            st.code(f"{base_url}/api/v1/detections/stats/summary")
             
-            with col3:
-                st.metric(
-                    label="Avg Confidence",
-                    value=f"{summary_data.get('average_confidence', 0):.2f}"
-                )
-            
-            with col4:
-                st.metric(
-                    label="Last 24h",
-                    value=summary_data.get("detections_last_24h", 0)
-                )
-            
-            with col5:
-                st.metric(
-                    label="Last Hour",
-                    value=summary_data.get("detections_last_hour", 0)
-                )
-            
-            # Display raw data
-            st.subheader("Raw Summary Data")
-            st.json(summary_data)
+            st.write("**Expected Response:**")
+            st.code(
+                """
+                {
+                "total_detections": int,
+                "unique_persons": int,
+                "average_confidence": float,
+                "detections_last_24h": int,
+                "detections_last_hour": int
+                }
+            """)
+        
+        # Make the API call and show the process
+        st.subheader("🚀 Making API Call")
+        
+        if st.button("Execute API Call", key="summary_call"):
+            with st.spinner("Calling API..."):
+                st.write("**Step 1: Sending Request**")
+                st.code(f"requests.get('{base_url}/api/v1/detections/stats/summary', headers={headers})")
+                
+                summary_data = make_api_call("/detections/stats/summary")
+                
+                if summary_data:
+                    st.write("**Step 2: Response Received**")
+                    st.success("✅ API call successful!")
+                    
+                    # Show response details
+                    st.write("**Response Status:** 200 OK")
+                    st.write("**Response Headers:**")
+                    st.json({"Content-Type": "application/json", "Authorization": "Bearer ***"})
+                    
+                    st.write("**Response Body:**")
+                    st.json(summary_data)
+                    
+                    # Show how the data is used
+                    st.write("**Step 3: Data Processing**")
+                    st.write("The response data can be used to create metrics:")
+                    
+                    col1, col2, col3, col4, col5 = st.columns(5)
+                    
+                    with col1:
+                        st.metric(
+                            label="Total Detections",
+                            value=summary_data.get("total_detections", 0)
+                        )
+                    
+                    with col2:
+                        st.metric(
+                            label="Unique Persons",
+                            value=summary_data.get("unique_persons", 0)
+                        )
+                    
+                    with col3:
+                        st.metric(
+                            label="Avg Confidence",
+                            value=f"{summary_data.get('average_confidence', 0):.2f}"
+                        )
+                    
+                    with col4:
+                        st.metric(
+                            label="Last 24h",
+                            value=summary_data.get("detections_last_24h", 0)
+                        )
+                    
+                    with col5:
+                        st.metric(
+                            label="Last Hour",
+                            value=summary_data.get("detections_last_hour", 0)
+                        )
+                    
+                    st.write("**Step 4: Backend Implementation**")
+                    st.code("""
+# Backend route implementation
+@router.get("/stats/summary", response_model=dict)
+def get_detection_summary(session: SessionDep, current_user: CurrentUser):
+    # Total detections
+    total_count = session.exec(select(func.count()).select_from(Detection)).one()
+    
+    # Unique persons
+    unique_persons = session.exec(select(func.count(func.distinct(Detection.person_id)))).one()
+    
+    # Average confidence
+    avg_confidence = session.exec(select(func.avg(Detection.confidence))).one()
+    
+    # Last 24h detections
+    last_24h_time = datetime.now(timezone.utc) - timedelta(hours=24)
+    last_24h_count = session.exec(
+        select(func.count()).select_from(Detection)
+        .where(Detection.detection_time >= last_24h_time)
+    ).one()
+    
+    return {
+        "total_detections": total_count,
+        "unique_persons": unique_persons,
+        "average_confidence": round(float(avg_confidence or 0), 2),
+        "detections_last_24h": last_24h_count,
+        "detections_last_hour": last_1h_count,
+    }
+                    """)
+                else:
+                    st.error("❌ API call failed")
+        else:
+            st.info("Click 'Execute API Call' to see the request/response flow")
     
     with tab2:
-        st.header("👥 Person Detection Analytics")
+        st.header("👥 Person Detection Analytics API")
+        st.write("This demonstrates the `/detections/stats/by-person` endpoint")
         
-        # Get person stats
-        person_stats = make_api_call("/detections/stats/by-person", {"limit": 20})
+        # Show API request details
+        st.subheader("🔗 API Request Details")
+        col1, col2 = st.columns([1, 2])
         
-        if person_stats:
-            # Create DataFrame for better visualization
-            df_persons = pd.DataFrame(person_stats)
+        with col1:
+            st.write("**Endpoint:**")
+            st.code("GET /api/v1/detections/stats/by-person")
             
-            if not df_persons.empty:
-                # Top persons by detection count
-                st.subheader("Top Persons by Detection Count")
-                fig = px.bar(
-                    df_persons.head(10), 
-                    x='person_id', 
-                    y='detection_count',
-                    title="Detection Count by Person",
-                    labels={'person_id': 'Person ID', 'detection_count': 'Detection Count'}
-                )
-                fig.update_xaxes(tickangle=45)
-                st.plotly_chart(fig, use_container_width=True)
+            st.write("**Query Parameters:**")
+            st.code("""
+limit: int (default: 10)
+- Maximum number of persons to return
+- Range: 1-100
+            """)
+            
+            st.write("**Headers:**")
+            st.json(headers)
+        
+        with col2:
+            st.write("**Request URL:**")
+            st.code(f"{base_url}/api/v1/detections/stats/by-person?limit=20")
+            
+            st.write("**Expected Response:**")
+            st.code("""
+[
+  {
+    "person_id": "string",
+    "detection_count": int,
+    "avg_confidence": float,
+    "first_seen": "ISO datetime",
+    "last_seen": "ISO datetime",
+    "total_time_tracked": float
+  }
+]
+            """)
+        
+        # Parameter input
+        st.subheader("⚙️ Request Parameters")
+        limit = st.slider("Limit", min_value=1, max_value=100, value=20, help="Maximum number of persons to return")
+        
+        # Make the API call and show the process
+        st.subheader("🚀 Making API Call")
+        
+        if st.button("Execute API Call", key="person_call"):
+            with st.spinner("Calling API..."):
+                st.write("**Step 1: Sending Request**")
+                st.code(f"requests.get('{base_url}/api/v1/detections/stats/by-person?limit={limit}', headers={headers})")
                 
-                # Average confidence by person
-                st.subheader("Average Confidence by Person")
-                fig2 = px.scatter(
-                    df_persons.head(10),
-                    x='person_id',
-                    y='avg_confidence',
-                    size='detection_count',
-                    title="Confidence vs Detection Count",
-                    labels={'person_id': 'Person ID', 'avg_confidence': 'Average Confidence'}
-                )
-                fig2.update_xaxes(tickangle=45)
-                st.plotly_chart(fig2, use_container_width=True)
+                person_stats = make_api_call("/detections/stats/by-person", {"limit": limit})
                 
-                # Display table
-                st.subheader("Detailed Person Statistics")
-                st.dataframe(df_persons, use_container_width=True)
-            else:
-                st.info("No person data available")
+                if person_stats:
+                    st.write("**Step 2: Response Received**")
+                    st.success("✅ API call successful!")
+                    
+                    # Show response details
+                    st.write("**Response Status:** 200 OK")
+                    st.write("**Response Body:**")
+                    st.json(person_stats)
+                    
+                    # Show how the data is used
+                    st.write("**Step 3: Data Processing**")
+                    st.write(f"Received {len(person_stats)} person records")
+                    
+                    if person_stats:
+                        # Create DataFrame for display
+                        df_persons = pd.DataFrame(person_stats)
+                        st.write("**DataFrame Creation:**")
+                        st.code("df_persons = pd.DataFrame(person_stats)")
+                        st.dataframe(df_persons, use_container_width=True)
+                        
+                        # Show metrics
+                        st.write("**Step 4: Metrics Calculation**")
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            total_persons = len(person_stats)
+                            st.metric("Total Persons", total_persons)
+                        
+                        with col2:
+                            total_detections = sum(p.get('detection_count', 0) for p in person_stats)
+                            st.metric("Total Detections", total_detections)
+                        
+                        with col3:
+                            avg_confidence = sum(p.get('avg_confidence', 0) for p in person_stats) / len(person_stats) if person_stats else 0
+                            st.metric("Avg Confidence", f"{avg_confidence:.2f}")
+                    
+                    st.write("**Step 5: Backend Implementation**")
+                    st.code("""
+# Backend route implementation
+@router.get("/stats/by-person", response_model=list[dict])
+def get_detections_by_person_stats(session: SessionDep, current_user: CurrentUser, limit: int = 10):
+    # Get all unique person IDs
+    person_ids = session.exec(select(Detection.person_id).distinct()).all()
+    
+    results = []
+    for person_id in person_ids:
+        stats = get_person_detection_stats(session=session, person_id=person_id)
+        
+        # Get average confidence for this person
+        avg_confidence = session.exec(
+            select(func.avg(Detection.confidence))
+            .where(Detection.person_id == person_id)
+        ).one()
+        
+        results.append({
+            "person_id": person_id,
+            "detection_count": stats["detection_count"],
+            "avg_confidence": round(float(avg_confidence or 0), 2),
+            "first_seen": stats["first_detection_time"].isoformat(),
+            "last_seen": stats["last_detection_time"].isoformat(),
+            "total_time_tracked": round(stats["elapsed_time"], 2),
+        })
+    
+    # Sort by detection count and limit
+    results.sort(key=lambda x: x["detection_count"], reverse=True)
+    return results[:limit]
+                    """)
+                else:
+                    st.error("❌ API call failed")
+        else:
+            st.info("Click 'Execute API Call' to see the request/response flow")
     
     with tab3:
-        st.header("📈 Detection Timeline")
+        st.header("📈 Detection Timeline API")
+        st.write("This demonstrates the `/detections/stats/timeline` endpoint")
         
-        # Timeline controls
+        # Show API request details
+        st.subheader("🔗 API Request Details")
+        col1, col2 = st.columns([1, 2])
+        
+        with col1:
+            st.write("**Endpoint:**")
+            st.code("GET /api/v1/detections/stats/timeline")
+            
+            st.write("**Query Parameters:**")
+            st.code("""
+hours: int (default: 24)
+- Number of hours to look back
+- Range: 1-168
+
+interval_minutes: int (default: 60)
+- Interval in minutes for grouping
+- Range: 5-1440
+            """)
+            
+            st.write("**Headers:**")
+            st.json(headers)
+        
+        with col2:
+            st.write("**Request URL:**")
+            st.code(f"{base_url}/api/v1/detections/stats/timeline?hours=24&interval_minutes=60")
+            
+            st.write("**Expected Response:**")
+            st.code("""
+[
+  {
+    "timestamp": "ISO datetime",
+    "detection_count": int,
+    "unique_persons": int,
+    "avg_confidence": float
+  }
+]
+            """)
+        
+        # Parameter inputs
+        st.subheader("⚙️ Request Parameters")
         col1, col2 = st.columns(2)
         with col1:
-            hours = st.slider("Hours to look back", 1, 168, 24)
+            hours = st.slider("Hours to look back", 1, 168, 24, help="Number of hours to look back")
         with col2:
-            interval_minutes = st.slider("Interval (minutes)", 5, 1440, 60)
+            interval_minutes = st.slider("Interval (minutes)", 5, 1440, 60, help="Interval in minutes for grouping")
         
-        # Get timeline data
-        timeline_data = make_api_call("/detections/stats/timeline", {
-            "hours": hours,
-            "interval_minutes": interval_minutes
+        # Make the API call and show the process
+        st.subheader("🚀 Making API Call")
+        
+        if st.button("Execute API Call", key="timeline_call"):
+            with st.spinner("Calling API..."):
+                st.write("**Step 1: Sending Request**")
+                st.code(f"requests.get('{base_url}/api/v1/detections/stats/timeline?hours={hours}&interval_minutes={interval_minutes}', headers={headers})")
+                
+                timeline_data = make_api_call("/detections/stats/timeline", {
+                    "hours": hours,
+                    "interval_minutes": interval_minutes
+                })
+                
+                if timeline_data:
+                    st.write("**Step 2: Response Received**")
+                    st.success("✅ API call successful!")
+                    
+                    # Show response details
+                    st.write("**Response Status:** 200 OK")
+                    st.write("**Response Body:**")
+                    st.json(timeline_data)
+                    
+                    # Show how the data is used
+                    st.write("**Step 3: Data Processing**")
+                    st.write(f"Received {len(timeline_data)} time intervals")
+                    
+                    if timeline_data:
+                        # Create DataFrame for display
+                        df_timeline = pd.DataFrame(timeline_data)
+                        st.write("**DataFrame Creation:**")
+                        st.code("df_timeline = pd.DataFrame(timeline_data)")
+                        st.dataframe(df_timeline, use_container_width=True)
+                        
+                        # Show metrics
+                        st.write("**Step 4: Metrics Calculation**")
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            total_detections = sum(d.get('detection_count', 0) for d in timeline_data)
+                            st.metric("Total Detections", total_detections)
+                        
+                        with col2:
+                            max_unique = max(d.get('unique_persons', 0) for d in timeline_data) if timeline_data else 0
+                            st.metric("Max Unique Persons", max_unique)
+                        
+                        with col3:
+                            avg_confidence = sum(d.get('avg_confidence', 0) for d in timeline_data) / len(timeline_data) if timeline_data else 0
+                            st.metric("Avg Confidence", f"{avg_confidence:.2f}")
+                    
+                    st.write("**Step 5: Backend Implementation**")
+                    st.code("""
+# Backend route implementation
+@router.get("/stats/timeline", response_model=list[dict])
+def get_detection_timeline(session: SessionDep, current_user: CurrentUser, 
+                          hours: int = 24, interval_minutes: int = 60):
+    now = datetime.now(timezone.utc)
+    start_time = now - timedelta(hours=hours)
+    
+    # Get all detections in the time range
+    detections = get_detections_by_time_range(session=session, start_time=start_time, end_time=now)
+    
+    # Group by intervals
+    timeline = {}
+    interval_seconds = interval_minutes * 60
+    
+    for detection in detections:
+        # Round datetime down to nearest interval
+        detection_time = detection.detection_time
+        if detection_time.tzinfo is None:
+            detection_time = detection_time.replace(tzinfo=timezone.utc)
+        
+        # Calculate interval timestamp
+        epoch = datetime(1970, 1, 1, tzinfo=timezone.utc)
+        seconds_since_epoch = int((detection_time - epoch).total_seconds())
+        interval_timestamp = (seconds_since_epoch // interval_seconds) * interval_seconds
+        interval_time = epoch + timedelta(seconds=interval_timestamp)
+        interval_key = interval_time.isoformat()
+        
+        if interval_key not in timeline:
+            timeline[interval_key] = {
+                "timestamp": interval_key,
+                "count": 0,
+                "unique_persons": set(),
+                "avg_confidence": [],
+            }
+        
+        timeline[interval_key]["count"] += 1
+        timeline[interval_key]["unique_persons"].add(detection.person_id)
+        timeline[interval_key]["avg_confidence"].append(detection.confidence)
+    
+    # Convert to list and calculate averages
+    result = []
+    for timestamp in sorted(timeline.keys()):
+        data = timeline[timestamp]
+        result.append({
+            "timestamp": timestamp,
+            "detection_count": data["count"],
+            "unique_persons": len(data["unique_persons"]),
+            "avg_confidence": round(sum(data["avg_confidence"]) / len(data["avg_confidence"]), 2)
         })
-        
-        if timeline_data:
-            df_timeline = pd.DataFrame(timeline_data)
-            
-            if not df_timeline.empty:
-                # Convert timestamp to datetime
-                df_timeline['timestamp'] = pd.to_datetime(df_timeline['timestamp'])
-                
-                # Detection count over time
-                st.subheader("Detection Count Over Time")
-                fig = px.line(
-                    df_timeline, 
-                    x='timestamp', 
-                    y='detection_count',
-                    title=f"Detections Over Last {hours} Hours"
-                )
-                st.plotly_chart(fig, use_container_width=True)
-                
-                # Unique persons over time
-                st.subheader("Unique Persons Over Time")
-                fig2 = px.line(
-                    df_timeline, 
-                    x='timestamp', 
-                    y='unique_persons',
-                    title=f"Unique Persons Over Last {hours} Hours"
-                )
-                st.plotly_chart(fig2, use_container_width=True)
-                
-                # Combined chart
-                st.subheader("Combined Timeline View")
-                fig3 = go.Figure()
-                fig3.add_trace(go.Scatter(
-                    x=df_timeline['timestamp'], 
-                    y=df_timeline['detection_count'],
-                    mode='lines+markers',
-                    name='Detection Count',
-                    yaxis='y'
-                ))
-                fig3.add_trace(go.Scatter(
-                    x=df_timeline['timestamp'], 
-                    y=df_timeline['unique_persons'],
-                    mode='lines+markers',
-                    name='Unique Persons',
-                    yaxis='y2'
-                ))
-                
-                fig3.update_layout(
-                    title=f"Detection Activity Over Last {hours} Hours",
-                    xaxis_title="Time",
-                    yaxis=dict(title="Detection Count", side="left"),
-                    yaxis2=dict(title="Unique Persons", side="right", overlaying="y"),
-                    hovermode='x unified'
-                )
-                st.plotly_chart(fig3, use_container_width=True)
-            else:
-                st.info("No timeline data available for the selected period")
+    
+    return result
+                    """)
+                else:
+                    st.error("❌ API call failed")
+        else:
+            st.info("Click 'Execute API Call' to see the request/response flow")
     
     with tab4:
-        st.header("🎯 Currently Active Persons")
+        st.header("🎯 Active Persons API")
+        st.write("This demonstrates the `/detections/stats/active-persons` endpoint")
         
-        # Active persons controls
-        minutes = st.slider("Activity window (minutes)", 1, 1440, 5)
+        # Show API request details
+        st.subheader("🔗 API Request Details")
+        col1, col2 = st.columns([1, 2])
         
-        # Get active persons
-        active_persons = make_api_call("/detections/stats/active-persons", {"minutes": minutes})
+        with col1:
+            st.write("**Endpoint:**")
+            st.code("GET /api/v1/detections/stats/active-persons")
+            
+            st.write("**Query Parameters:**")
+            st.code("""
+minutes: int (default: 5)
+- Time window in minutes to consider a person active
+- Range: 1-1440
+            """)
+            
+            st.write("**Headers:**")
+            st.json(headers)
         
-        if active_persons:
-            if active_persons:
-                st.subheader(f"Persons Active in Last {minutes} Minutes")
+        with col2:
+            st.write("**Request URL:**")
+            st.code(f"{base_url}/api/v1/detections/stats/active-persons?minutes=5")
+            
+            st.write("**Expected Response:**")
+            st.code("""
+[
+  {
+    "person_id": "string",
+    "last_seen": "ISO datetime",
+    "confidence": float,
+    "elapsed_time": float,
+    "bbox": {
+      "x1": float, "y1": float,
+      "x2": float, "y2": float
+    }
+  }
+]
+            """)
+        
+        # Parameter input
+        st.subheader("⚙️ Request Parameters")
+        minutes = st.slider("Activity window (minutes)", 1, 1440, 5, help="Time window to consider a person active")
+        
+        # Make the API call and show the process
+        st.subheader("🚀 Making API Call")
+        
+        if st.button("Execute API Call", key="active_call"):
+            with st.spinner("Calling API..."):
+                st.write("**Step 1: Sending Request**")
+                st.code(f"requests.get('{base_url}/api/v1/detections/stats/active-persons?minutes={minutes}', headers={headers})")
                 
-                # Create DataFrame
-                df_active = pd.DataFrame(active_persons)
+                active_persons = make_api_call("/detections/stats/active-persons", {"minutes": minutes})
                 
-                if not df_active.empty:
-                    # Convert last_seen to datetime
-                    df_active['last_seen'] = pd.to_datetime(df_active['last_seen'])
+                if active_persons is not None:
+                    st.write("**Step 2: Response Received**")
+                    st.success("✅ API call successful!")
                     
-                    # Display metrics
-                    col1, col2, col3 = st.columns(3)
-                    with col1:
-                        st.metric("Active Persons", len(df_active))
-                    with col2:
-                        avg_confidence = df_active['confidence'].mean()
-                        st.metric("Avg Confidence", f"{avg_confidence:.2f}")
-                    with col3:
-                        total_time = df_active['elapsed_time'].sum()
-                        st.metric("Total Time Tracked", f"{total_time:.1f}s")
+                    # Show response details
+                    st.write("**Response Status:** 200 OK")
+                    st.write("**Response Body:**")
+                    st.json(active_persons)
                     
-                    # Display table
-                    st.subheader("Active Person Details")
-                    st.dataframe(df_active, use_container_width=True)
+                    # Show how the data is used
+                    st.write("**Step 3: Data Processing**")
+                    st.write(f"Received {len(active_persons)} active person records")
                     
-                    # Confidence distribution of active persons
-                    st.subheader("Confidence Distribution of Active Persons")
-                    fig = px.histogram(
-                        df_active, 
-                        x='confidence',
-                        title="Confidence Score Distribution",
-                        nbins=20
-                    )
-                    st.plotly_chart(fig, use_container_width=True)
+                    if active_persons:
+                        # Create DataFrame for display
+                        df_active = pd.DataFrame(active_persons)
+                        st.write("**DataFrame Creation:**")
+                        st.code("df_active = pd.DataFrame(active_persons)")
+                        st.dataframe(df_active, use_container_width=True)
+                        
+                        # Show metrics
+                        st.write("**Step 4: Metrics Calculation**")
+                        col1, col2, col3 = st.columns(3)
+                        
+                        with col1:
+                            st.metric("Active Persons", len(active_persons))
+                        
+                        with col2:
+                            avg_confidence = sum(p.get('confidence', 0) for p in active_persons) / len(active_persons) if active_persons else 0
+                            st.metric("Avg Confidence", f"{avg_confidence:.2f}")
+                        
+                        with col3:
+                            total_time = sum(p.get('elapsed_time', 0) for p in active_persons)
+                            st.metric("Total Time Tracked", f"{total_time:.1f}s")
+                    else:
+                        st.info(f"No persons active in the last {minutes} minutes")
+                    
+                    st.write("**Step 5: Backend Implementation**")
+                    st.code("""
+# Backend route implementation
+@router.get("/stats/active-persons", response_model=list[dict])
+def get_active_persons(session: SessionDep, current_user: CurrentUser, minutes: int = 5):
+    cutoff_time = datetime.now(timezone.utc) - timedelta(minutes=minutes)
+    
+    # Get all unique person IDs detected recently
+    person_ids = session.exec(
+        select(Detection.person_id)
+        .where(Detection.detection_time >= cutoff_time)
+        .distinct()
+    ).all()
+    
+    # Get latest detection for each person
+    active_persons = []
+    for person_id in person_ids:
+        latest_detection = get_latest_detection_by_person_id(session=session, person_id=person_id)
+        if latest_detection:
+            # Ensure timezone awareness
+            last_seen = latest_detection.detection_time
+            if last_seen.tzinfo is None:
+                last_seen = last_seen.replace(tzinfo=timezone.utc)
+            
+            # Get person stats to calculate elapsed time
+            stats = get_person_detection_stats(session=session, person_id=latest_detection.person_id)
+            
+            active_persons.append({
+                "person_id": latest_detection.person_id,
+                "last_seen": last_seen.isoformat(),
+                "confidence": round(latest_detection.confidence, 2),
+                "elapsed_time": round(stats["elapsed_time"], 2),
+                "bbox": {
+                    "x1": latest_detection.bbox_x1,
+                    "y1": latest_detection.bbox_y1,
+                    "x2": latest_detection.bbox_x2,
+                    "y2": latest_detection.bbox_y2,
+                },
+            })
+    
+    # Sort by last_seen descending
+    active_persons.sort(key=lambda x: x["last_seen"], reverse=True)
+    return active_persons
+                    """)
                 else:
-                    st.info(f"No persons active in the last {minutes} minutes")
-            else:
-                st.info("No active person data available")
+                    st.error("❌ API call failed")
+        else:
+            st.info("Click 'Execute API Call' to see the request/response flow")
     
     with tab5:
-        st.header("📊 Confidence Score Distribution")
+        st.header("📊 Confidence Distribution API")
+        st.write("This demonstrates the `/detections/stats/confidence-distribution` endpoint")
         
-        # Get confidence distribution
-        confidence_dist = make_api_call("/detections/stats/confidence-distribution")
+        # Show API request details
+        st.subheader("🔗 API Request Details")
+        col1, col2 = st.columns([1, 2])
         
-        if confidence_dist:
-            # Prepare data for visualization
-            ranges = []
-            counts = []
-            labels = []
+        with col1:
+            st.write("**Endpoint:**")
+            st.code("GET /api/v1/detections/stats/confidence-distribution")
             
-            for range_label, data in confidence_dist.items():
-                ranges.append(data['range'])
-                counts.append(data['count'])
-                labels.append(f"{range_label.title()}\n({data['range']})")
+            st.write("**Query Parameters:**")
+            st.code("None - No parameters required")
             
-            # Create pie chart
-            st.subheader("Confidence Score Distribution")
-            fig = px.pie(
-                values=counts,
-                names=labels,
-                title="Distribution of Detection Confidence Scores"
-            )
-            st.plotly_chart(fig, use_container_width=True)
+            st.write("**Headers:**")
+            st.json(headers)
+        
+        with col2:
+            st.write("**Request URL:**")
+            st.code(f"{base_url}/api/v1/detections/stats/confidence-distribution")
             
-            # Create bar chart
-            st.subheader("Confidence Ranges - Bar Chart")
-            fig2 = px.bar(
-                x=labels,
-                y=counts,
-                title="Detection Count by Confidence Range",
-                labels={'x': 'Confidence Range', 'y': 'Detection Count'}
-            )
-            fig2.update_xaxes(tickangle=45)
-            st.plotly_chart(fig2, use_container_width=True)
-            
-            # Display raw data
-            st.subheader("Raw Distribution Data")
-            st.json(confidence_dist)
+            st.write("**Expected Response:**")
+            st.code("""
+{
+  "low": {
+    "range": "0.0-0.5",
+    "count": int
+  },
+  "medium": {
+    "range": "0.5-0.7",
+    "count": int
+  },
+  "high": {
+    "range": "0.7-0.85",
+    "count": int
+  },
+  "very_high": {
+    "range": "0.85-1.0",
+    "count": int
+  }
+}
+            """)
+        
+        # Make the API call and show the process
+        st.subheader("🚀 Making API Call")
+        
+        if st.button("Execute API Call", key="confidence_call"):
+            with st.spinner("Calling API..."):
+                st.write("**Step 1: Sending Request**")
+                st.code(f"requests.get('{base_url}/api/v1/detections/stats/confidence-distribution', headers={headers})")
+                
+                confidence_dist = make_api_call("/detections/stats/confidence-distribution")
+                
+                if confidence_dist:
+                    st.write("**Step 2: Response Received**")
+                    st.success("✅ API call successful!")
+                    
+                    # Show response details
+                    st.write("**Response Status:** 200 OK")
+                    st.write("**Response Body:**")
+                    st.json(confidence_dist)
+                    
+                    # Show how the data is used
+                    st.write("**Step 3: Data Processing**")
+                    st.write("Processing confidence distribution data...")
+                    
+                    # Prepare data for visualization
+                    ranges = []
+                    counts = []
+                    labels = []
+                    
+                    for range_label, data in confidence_dist.items():
+                        ranges.append(data['range'])
+                        counts.append(data['count'])
+                        labels.append(f"{range_label.title()}\n({data['range']})")
+                    
+                    st.write("**Data Processing Code:**")
+                    st.code("""
+# Process confidence distribution data
+ranges = []
+counts = []
+labels = []
+
+for range_label, data in confidence_dist.items():
+    ranges.append(data['range'])
+    counts.append(data['count'])
+    labels.append(f"{range_label.title()}\\n({data['range']})")
+                    """)
+                    
+                    # Show metrics
+                    st.write("**Step 4: Metrics Calculation**")
+                    col1, col2, col3, col4 = st.columns(4)
+                    
+                    with col1:
+                        st.metric("Low (0.0-0.5)", confidence_dist.get('low', {}).get('count', 0))
+                    
+                    with col2:
+                        st.metric("Medium (0.5-0.7)", confidence_dist.get('medium', {}).get('count', 0))
+                    
+                    with col3:
+                        st.metric("High (0.7-0.85)", confidence_dist.get('high', {}).get('count', 0))
+                    
+                    with col4:
+                        st.metric("Very High (0.85-1.0)", confidence_dist.get('very_high', {}).get('count', 0))
+                    
+                    # Show total
+                    total_detections = sum(data.get('count', 0) for data in confidence_dist.values())
+                    st.metric("Total Detections", total_detections)
+                    
+                    st.write("**Step 5: Backend Implementation**")
+                    st.code("""
+# Backend route implementation
+@router.get("/stats/confidence-distribution", response_model=dict)
+def get_confidence_distribution(session: SessionDep, current_user: CurrentUser):
+    ranges = [
+        (0.0, 0.5, "low"),
+        (0.5, 0.7, "medium"),
+        (0.7, 0.85, "high"),
+        (0.85, 1.0, "very_high"),
+    ]
+    
+    distribution = {}
+    for min_conf, max_conf, label in ranges:
+        count = session.exec(
+            select(func.count())
+            .select_from(Detection)
+            .where(Detection.confidence >= min_conf, Detection.confidence < max_conf)
+        ).one()
+        distribution[label] = {
+            "range": f"{min_conf}-{max_conf}",
+            "count": count,
+        }
+    
+    return distribution
+                    """)
+                else:
+                    st.error("❌ API call failed")
+        else:
+            st.info("Click 'Execute API Call' to see the request/response flow")
     
     with tab6:
         st.header("🔍 Detailed Detection Queries")
