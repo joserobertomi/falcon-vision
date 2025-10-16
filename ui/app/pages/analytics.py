@@ -9,6 +9,7 @@ def main():
     st.divider()
     
     metric = st.sidebar.selectbox("Select a format for analytics", ["Real demo", "Stored analytics"])
+    st.sidebar.divider()
     
     if metric == "Real demo":
         real_demo_analytics()
