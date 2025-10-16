@@ -55,9 +55,6 @@ theme:
 # Plugins
 plugins:
   - search
-  - git-revision-date-localized:
-      enable_creation_date: true
-      fallback_to_build_date: true
   - minify:
       minify_html: true
 
@@ -121,7 +118,7 @@ nav:
     - Production: deployment/production.md
     - Environment Variables: deployment/environment.md
   - Guides:
-    - WebSocket Implementation: guides/websocket-implementation.md
+    - WebSocket Implementation: guides/web_socket_implementation.md
     - Authentication Updates: guides/authentication-updates.md
     - Video Streaming: guides/video-streaming.md
   - Changelog: changelog.md
@@ -133,5 +130,3 @@ extra:
       link: https://github.com/falcon-vision/falcon-vision
     - icon: fontawesome/brands/docker
       link: https://hub.docker.com/r/falcon-vision
-  version:
-    provider: mike

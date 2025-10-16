@@ -2,8 +2,7 @@
 
 All notable changes to Falcon Vision will be documented in this file.
 
-The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
-and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
 ## [Unreleased]
 
@@ -83,17 +82,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
-## Version History
+## Release History
 
-| Version | Release Date | Status | Notes |
-|---------|--------------|--------|-------|
+| Release | Date | Status | Notes |
+|---------|------|--------|-------|
 | 1.0.0 | 2024-01-01 | Stable | First stable release |
 | 0.9.0 | 2023-12-15 | Beta | Testing release |
 | 0.8.0 | 2023-12-01 | Alpha | Initial development |
 
 ## Migration Guides
 
-### Upgrading to 1.0.0
+### Upgrading to Latest Release
 
 #### Database Changes
 - Run database migrations: `alembic upgrade head`
@@ -110,7 +109,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Breaking Changes
 
-#### v1.0.0
+#### Latest Release
 - Changed WebSocket message format
 - Updated authentication flow
 - Modified database schema
@@ -119,21 +118,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Upcoming Features
 
-#### v1.1.0 (Planned)
+#### Next Release (Planned)
 - [ ] Multi-class detection support
 - [ ] Advanced analytics features
 - [ ] User role management
 - [ ] API rate limiting
 - [ ] Performance optimizations
 
-#### v1.2.0 (Planned)
+#### Future Releases (Planned)
 - [ ] Mobile app support
 - [ ] Cloud deployment guides
 - [ ] Advanced monitoring
 - [ ] Custom model support
 - [ ] Batch processing
 
-#### v2.0.0 (Future)
+#### Long-term Roadmap (Future)
 - [ ] Microservices architecture
 - [ ] Kubernetes support
 - [ ] Advanced AI features
