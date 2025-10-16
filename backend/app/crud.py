@@ -109,8 +109,8 @@ def delete_detection(*, session: Session, detection_id: uuid.UUID) -> Detection 
 def get_detections_by_time_range(*, session: Session, start_time: datetime, end_time: datetime) -> list[Detection]:
     """Get detections within a specific time range."""
     statement = select(Detection).where(
-        Detection.first_detection_time >= start_time,
-        Detection.first_detection_time <= end_time
+        Detection.detection_time >= start_time,
+        Detection.detection_time <= end_time
     )
     db_detections = session.exec(statement).all()
     return list(db_detections)
@@ -125,6 +125,46 @@ def get_detections_by_confidence(*, session: Session, min_confidence: float) -> 
 
 def get_latest_detection_by_person_id(*, session: Session, person_id: str) -> Detection | None:
     """Get the latest detection for a specific person ID."""
-    statement = select(Detection).where(Detection.person_id == person_id).order_by(Detection.last_detection_time.desc())
+    statement = select(Detection).where(Detection.person_id == person_id).order_by(Detection.detection_time.desc())
     db_detection = session.exec(statement).first()
     return db_detection
+
+
+def get_first_detection_by_person_id(*, session: Session, person_id: str) -> Detection | None:
+    """Get the first detection for a specific person ID."""
+    statement = select(Detection).where(Detection.person_id == person_id).order_by(Detection.detection_time.asc())
+    db_detection = session.exec(statement).first()
+    return db_detection
+
+
+def get_person_detection_stats(*, session: Session, person_id: str) -> dict:
+    """Get detection statistics for a specific person ID."""
+    from sqlmodel import func
+    
+    # Get first and last detection times
+    first_detection = get_first_detection_by_person_id(session=session, person_id=person_id)
+    last_detection = get_latest_detection_by_person_id(session=session, person_id=person_id)
+    
+    if not first_detection or not last_detection:
+        return {
+            "person_id": person_id,
+            "first_detection_time": None,
+            "last_detection_time": None,
+            "elapsed_time": 0.0,
+            "detection_count": 0
+        }
+    
+    # Calculate elapsed time
+    elapsed_time = (last_detection.detection_time - first_detection.detection_time).total_seconds()
+    
+    # Get total detection count
+    count_statement = select(func.count()).select_from(Detection).where(Detection.person_id == person_id)
+    detection_count = session.exec(count_statement).one()
+    
+    return {
+        "person_id": person_id,
+        "first_detection_time": first_detection.detection_time,
+        "last_detection_time": last_detection.detection_time,
+        "elapsed_time": elapsed_time,
+        "detection_count": detection_count
+    }

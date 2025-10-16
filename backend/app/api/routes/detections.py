@@ -13,6 +13,8 @@ from app.crud import (
     get_detections_by_person_id,
     get_detections_by_time_range,
     get_latest_detection_by_person_id,
+    get_first_detection_by_person_id,
+    get_person_detection_stats,
 )
 from app.models import Detection, DetectionPublic, DetectionsPublic
 
@@ -71,14 +73,14 @@ def get_detection_summary(
     now = datetime.now(timezone.utc)
     last_24h_time = now - timedelta(hours=24)
     last_24h_statement = select(func.count()).select_from(Detection).where(
-        Detection.first_detection_time >= last_24h_time
+        Detection.detection_time >= last_24h_time
     )
     last_24h_count = session.exec(last_24h_statement).one()
     
     # Detections in last hour
     last_1h_time = now - timedelta(hours=1)
     last_1h_statement = select(func.count()).select_from(Detection).where(
-        Detection.first_detection_time >= last_1h_time
+        Detection.detection_time >= last_1h_time
     )
     last_1h_count = session.exec(last_1h_statement).one()
     
@@ -107,34 +109,31 @@ def get_detections_by_person_stats(
     - First and last detection times
     - Total time tracked
     """
-    # Query to get stats per person
-    statement = (
-        select(
-            Detection.person_id,
-            func.count(Detection.id).label("detection_count"),
-            func.avg(Detection.confidence).label("avg_confidence"),
-            func.min(Detection.first_detection_time).label("first_seen"),
-            func.max(Detection.last_detection_time).label("last_seen"),
-            func.max(Detection.elapsed_time).label("total_time_tracked"),
-        )
-        .group_by(Detection.person_id)
-        .order_by(func.count(Detection.id).desc())
-        .limit(limit)
-    )
+    # Get all unique person IDs
+    person_ids_statement = select(Detection.person_id).distinct()
+    person_ids = session.exec(person_ids_statement).all()
     
-    results = session.exec(statement).all()
+    # Get stats for each person
+    results = []
+    for person_id in person_ids:
+        stats = get_person_detection_stats(session=session, person_id=person_id)
+        
+        # Get average confidence for this person
+        avg_confidence_statement = select(func.avg(Detection.confidence)).where(Detection.person_id == person_id)
+        avg_confidence = session.exec(avg_confidence_statement).one()
+        
+        results.append({
+            "person_id": person_id,
+            "detection_count": stats["detection_count"],
+            "avg_confidence": round(float(avg_confidence or 0), 2),
+            "first_seen": stats["first_detection_time"].isoformat() if stats["first_detection_time"] else None,
+            "last_seen": stats["last_detection_time"].isoformat() if stats["last_detection_time"] else None,
+            "total_time_tracked": round(stats["elapsed_time"], 2),
+        })
     
-    return [
-        {
-            "person_id": row.person_id,
-            "detection_count": row.detection_count,
-            "avg_confidence": round(float(row.avg_confidence), 2),
-            "first_seen": row.first_seen.isoformat(),
-            "last_seen": row.last_seen.isoformat(),
-            "total_time_tracked": round(float(row.total_time_tracked), 2),
-        }
-        for row in results
-    ]
+    # Sort by detection count and limit
+    results.sort(key=lambda x: x["detection_count"], reverse=True)
+    return results[:limit]
 
 
 @router.get("/stats/timeline", response_model=list[dict])
@@ -165,7 +164,7 @@ def get_detection_timeline(
     
     for detection in detections:
         # Round datetime down to nearest interval
-        detection_time = detection.first_detection_time
+        detection_time = detection.detection_time
         if detection_time.tzinfo is None:
             detection_time = detection_time.replace(tzinfo=timezone.utc)
         
@@ -220,7 +219,7 @@ def get_active_persons(
     # Get all unique person IDs detected recently
     statement = (
         select(Detection.person_id)
-        .where(Detection.last_detection_time >= cutoff_time)
+        .where(Detection.detection_time >= cutoff_time)
         .distinct()
     )
     
@@ -235,15 +234,18 @@ def get_active_persons(
         )
         if latest_detection:
             # Ensure timezone awareness
-            last_seen = latest_detection.last_detection_time
+            last_seen = latest_detection.detection_time
             if last_seen.tzinfo is None:
                 last_seen = last_seen.replace(tzinfo=timezone.utc)
+            
+            # Get person stats to calculate elapsed time
+            stats = get_person_detection_stats(session=session, person_id=latest_detection.person_id)
             
             active_persons.append({
                 "person_id": latest_detection.person_id,
                 "last_seen": last_seen.isoformat(),
                 "confidence": round(latest_detection.confidence, 2),
-                "elapsed_time": round(latest_detection.elapsed_time, 2),
+                "elapsed_time": round(stats["elapsed_time"], 2),
                 "bbox": {
                     "x1": latest_detection.bbox_x1,
                     "y1": latest_detection.bbox_y1,
