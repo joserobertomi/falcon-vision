@@ -74,7 +74,7 @@ class FrameProcessor:
         
         # Database persistence tracking
         self.last_db_save: Dict[str, float] = {}  # Track last DB save time for each person
-        self.db_save_interval = 5.0  # Save to DB every 5 seconds
+        self.db_save_interval = 1.0  # Save to DB every 1 seconds
         
         logger.info("FrameProcessor initialized successfully!")
     
