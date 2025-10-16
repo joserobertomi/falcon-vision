@@ -12,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/ws", tags=["video-streaming"])
 
-
-
 @router.websocket("/video")
 async def video_stream_endpoint(
     websocket: WebSocket,

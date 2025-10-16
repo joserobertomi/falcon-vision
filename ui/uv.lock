@@ -57,25 +57,6 @@ wheels = [
 ]
 
 [[package]]
-name = "ui"
-version = "0.1.0"
-source = { virtual = "." }
-dependencies = [
-    { name = "fastapi" },
-    { name = "requests" },
-    { name = "streamlit" },
-    { name = "uvicorn" },
-]
-
-[package.metadata]
-requires-dist = [
-    { name = "fastapi", specifier = ">=0.119.0" },
-    { name = "requests", specifier = ">=2.31.0" },
-    { name = "streamlit", specifier = ">=1.50.0" },
-    { name = "uvicorn", specifier = ">=0.37.0" },
-]
-
-[[package]]
 name = "blinker"
 version = "1.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -737,6 +718,19 @@ wheels = [
 ]
 
 [[package]]
+name = "plotly"
+version = "6.3.1"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "narwhals" },
+    { name = "packaging" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/0c/63/961d47c9ffd592a575495891cdcf7875dc0903ebb33ac238935714213789/plotly-6.3.1.tar.gz", hash = "sha256:dd896e3d940e653a7ce0470087e82c2bd903969a55e30d1b01bb389319461bb0", size = 6956460, upload-time = "2025-10-02T16:10:34.16Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/3f/93/023955c26b0ce614342d11cc0652f1e45e32393b6ab9d11a664a60e9b7b7/plotly-6.3.1-py3-none-any.whl", hash = "sha256:8b4420d1dcf2b040f5983eed433f95732ed24930e496d36eb70d211923532e64", size = 9833698, upload-time = "2025-10-02T16:10:22.584Z" },
+]
+
+[[package]]
 name = "protobuf"
 version = "6.32.1"
 source = { registry = "https://pypi.org/simple" }
@@ -1256,6 +1250,27 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/95/32/1a225d6164441be760d75c2c42e2780dc0873fe382da3e98a2e1e48361e5/tzdata-2025.2.tar.gz", hash = "sha256:b60a638fcc0daffadf82fe0f57e53d06bdec2f36c4df66280ae79bce6bd6f2b9", size = 196380, upload-time = "2025-03-23T13:54:43.652Z" }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/5c/23/c7abc0ca0a1526a0774eca151daeb8de62ec457e77262b66b359c3c7679e/tzdata-2025.2-py2.py3-none-any.whl", hash = "sha256:1a403fada01ff9221ca8044d701868fa132215d84beb92242d9acd2147f667a8", size = 347839, upload-time = "2025-03-23T13:54:41.845Z" },
+]
+
+[[package]]
+name = "ui"
+version = "0.1.0"
+source = { virtual = "." }
+dependencies = [
+    { name = "fastapi" },
+    { name = "plotly" },
+    { name = "requests" },
+    { name = "streamlit" },
+    { name = "uvicorn" },
+]
+
+[package.metadata]
+requires-dist = [
+    { name = "fastapi", specifier = ">=0.119.0" },
+    { name = "plotly", specifier = ">=6.3.1" },
+    { name = "requests", specifier = ">=2.31.0" },
+    { name = "streamlit", specifier = ">=1.50.0" },
+    { name = "uvicorn", specifier = ">=0.37.0" },
 ]
 
 [[package]]
