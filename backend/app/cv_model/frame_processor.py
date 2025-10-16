@@ -341,8 +341,7 @@ class FrameProcessor:
                 'bbox': bbox,
                 'confidence': confidence,
                 'elapsed_time': round(elapsed_time, 2),
-                'first_detection_time': person_data['first_detection_time'],
-                'last_detection_time': person_data['last_detection_time']
+                'detection_time': person_data['last_detection_time']  # Current detection time
             })
         
         return annotated_frame, len(matched_persons), detections_info
@@ -389,9 +388,7 @@ class FrameProcessor:
                         bbox_x2=x2,
                         bbox_y2=y2,
                         confidence=detection['confidence'],
-                        elapsed_time=elapsed_time,
-                        first_detection_time=detection['first_detection_time'],
-                        last_detection_time=detection['last_detection_time']
+                        detection_time=detection['detection_time']  # Use current detection time
                     )
                     
                     # Save to database
