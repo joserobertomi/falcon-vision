@@ -8,7 +8,7 @@ from datetime import datetime, timedelta
 
 @st.cache_data
 def load_data():
-    df = pd.read_csv("data/detection-example.csv")
+    df = pd.read_csv("app/data/detection-example.csv")
     # Convert datetime columns
     df['detection_time'] = pd.to_datetime(df['detection_time'])
     df['created_at'] = pd.to_datetime(df['created_at'])
