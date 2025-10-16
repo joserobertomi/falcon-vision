@@ -1,13 +1,8 @@
-FROM python:3.10
+FROM python:3.13
 
 ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app/
-
-# Install system dependencies for QR code detection (pyzbar)
-RUN apt-get update && apt-get install -y \
-    libzbar0 \
-    && rm -rf /var/lib/apt/lists/*
 
 # Install uv
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#installing-uv
@@ -34,21 +29,22 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 ENV PYTHONPATH=/app
 
-COPY ./scripts /app/scripts
-
-COPY ./pyproject.toml ./uv.lock ./alembic.ini /app/
-
+# Copy project files
+COPY ./pyproject.toml ./uv.lock /app/
 COPY ./app /app/app
-COPY ./tests /app/tests
 
 # Sync the project
 # Ref: https://docs.astral.sh/uv/guides/integration/docker/#intermediate-layers
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync
 
-# Remove opencv-python (with GUI) and force-reinstall opencv-python-headless
-# ultralytics installs opencv-python by default, but we need headless for Docker
-RUN uv pip uninstall opencv-python || true && \
-    uv pip install --reinstall opencv-python-headless>=4.12.0.88
+# Streamlit configuration
+ENV STREAMLIT_SERVER_PORT=5174
+ENV STREAMLIT_SERVER_ADDRESS=0.0.0.0
+ENV STREAMLIT_SERVER_HEADLESS=true
+ENV STREAMLIT_BROWSER_GATHER_USAGE_STATS=false
 
-CMD ["fastapi", "run", "--workers", "4", "app/main.py"]
+# Expose Streamlit port
+EXPOSE 5174
+
+CMD ["streamlit", "run", "app/main.py", "--server.port=5174", "--server.address=0.0.0.0"]

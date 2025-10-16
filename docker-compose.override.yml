@@ -127,6 +127,15 @@ services:
     ports:
       - 9323:9323
 
+  ui:
+    restart: "no"
+    ports:
+      - "5174:5174"
+    build:
+      context: ./ui
+    environment:
+      - API_BASE_URL=http://backend:8000
+
 networks:
   traefik-public:
     # For local dev, don't expect an external Traefik network
