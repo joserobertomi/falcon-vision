@@ -1,0 +1,137 @@
+site_name: Falcon Vision Documentation
+site_description: Computer vision application with person detection and analytics
+site_author: Falcon Vision Team
+site_url: https://docs.falcon-vision.com
+
+# Repository
+repo_name: falcon-vision/falcon-vision
+repo_url: https://github.com/falcon-vision/falcon-vision
+edit_uri: edit/main/docs/
+
+# Configuration
+theme:
+  name: material
+  palette:
+    # Palette toggle for automatic mode
+    - media: "(prefers-color-scheme)"
+      toggle:
+        icon: material/brightness-auto
+        name: Switch to light mode
+
+    # Palette toggle for light mode
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-7
+        name: Switch to dark mode
+
+    # Palette toggle for dark mode
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: indigo
+      accent: indigo
+      toggle:
+        icon: material/brightness-4
+        name: Switch to system preference
+
+  features:
+    - navigation.tabs
+    - navigation.sections
+    - navigation.top
+    - navigation.path
+    - navigation.expand
+    - navigation.indexes
+    - search.highlight
+    - search.share
+    - content.code.copy
+    - content.code.annotate
+
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+
+# Plugins
+plugins:
+  - search
+  - git-revision-date-localized:
+      enable_creation_date: true
+      fallback_to_build_date: true
+  - minify:
+      minify_html: true
+
+# Markdown extensions
+markdown_extensions:
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+  - pymdownx.inlinehilite
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.superfences
+  - pymdownx.arithmatex
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - tables
+  - attr_list
+  - md_in_html
+
+# Page tree
+nav:
+  - Home: index.md
+  - Getting Started:
+    - Installation: getting-started/installation.md
+    - Quick Start: getting-started/quick-start.md
+    - Configuration: getting-started/configuration.md
+  - Architecture:
+    - Overview: architecture/overview.md
+    - Backend API: architecture/backend.md
+    - Frontend: architecture/frontend.md
+    - UI Dashboard: architecture/ui.md
+    - Computer Vision: architecture/computer-vision.md
+  - API Reference:
+    - Authentication: api/authentication.md
+    - WebSocket Streaming: api/websocket-streaming.md
+    - Person Detection: api/person-detection.md
+    - Analytics: api/analytics.md
+  - Development:
+    - Development Setup: development/setup.md
+    - Testing: development/testing.md
+    - Contributing: development/contributing.md
+  - Deployment:
+    - Docker: deployment/docker.md
+    - Production: deployment/production.md
+    - Environment Variables: deployment/environment.md
+  - Guides:
+    - WebSocket Implementation: guides/websocket-implementation.md
+    - Authentication Updates: guides/authentication-updates.md
+    - Video Streaming: guides/video-streaming.md
+  - Changelog: changelog.md
+
+# Extra
+extra:
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/falcon-vision/falcon-vision
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/r/falcon-vision
+  version:
+    provider: mike

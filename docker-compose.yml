@@ -190,6 +190,29 @@ services:
       # Redirect HTTP → HTTPS
       - traefik.http.routers.${STACK_NAME?Variable not set}-ui-http.middlewares=https-redirect
 
+  docs:
+    image: "${DOCKER_IMAGE_DOCS?Variable not set}:${TAG-latest}"
+    restart: always
+    networks:
+      - traefik-public
+      - default
+    build:
+      context: .
+      dockerfile: Dockerfile.docs
+    labels:
+      - traefik.enable=true
+      - traefik.docker.network=traefik-public
+      - traefik.constraint-label=traefik-public
+      - traefik.http.services.${STACK_NAME?Variable not set}-docs.loadbalancer.server.port=8001
+      - traefik.http.routers.${STACK_NAME?Variable not set}-docs-http.rule=Host(`docs.${DOMAIN?Variable not set}`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-docs-http.entrypoints=http
+      - traefik.http.routers.${STACK_NAME?Variable not set}-docs-https.rule=Host(`docs.${DOMAIN?Variable not set}`)
+      - traefik.http.routers.${STACK_NAME?Variable not set}-docs-https.entrypoints=https
+      - traefik.http.routers.${STACK_NAME?Variable not set}-docs-https.tls=true
+      - traefik.http.routers.${STACK_NAME?Variable not set}-docs-https.tls.certresolver=le
+      # Redirect HTTP → HTTPS
+      - traefik.http.routers.${STACK_NAME?Variable not set}-docs-http.middlewares=https-redirect
+
 volumes:
   app-db-data:
 
