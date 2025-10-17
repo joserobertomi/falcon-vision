@@ -161,6 +161,8 @@ def main():
         # Connection Settings
         st.header("Connection Settings")
         
+        
+        
         # Streaming Settings
         st.subheader("Streaming Settings")
         fps = st.slider("Streaming FPS:", min_value=1, max_value=10, value=5)
@@ -169,6 +171,7 @@ def main():
         
         # Get the token for WebSocket connection
         token = st.session_state.token
+        
         
         # Embed the WebSocket client
         websocket_client_html = f"""
@@ -292,6 +295,7 @@ def main():
                     margin-top: 5px;
                 }}
 
+
                 #log {{
                     background-color: #1e1e1e;
                     color: #d4d4d4;
@@ -309,12 +313,99 @@ def main():
                     color: #333;
                     margin-top: 0;
                 }}
+
+                @keyframes slideIn {{
+                    from {{ transform: translateX(100%); opacity: 0; }}
+                    to {{ transform: translateX(0); opacity: 1; }}
+                }}
+
+                @keyframes slideOut {{
+                    from {{ transform: translateX(0); opacity: 1; }}
+                    to {{ transform: translateX(100%); opacity: 0; }}
+                }}
+
+                .toast-container {{
+                    position: fixed;
+                    top: 20px;
+                    right: 20px;
+                    z-index: 1000;
+                    max-width: 400px;
+                }}
+
+                .toast {{
+                    background: white;
+                    border-left: 4px solid #4CAF50;
+                    box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                    border-radius: 4px;
+                    padding: 16px 20px;
+                    margin-bottom: 10px;
+                    display: flex;
+                    align-items: center;
+                    font-size: 14px;
+                    font-weight: 500;
+                    animation: slideInRight 0.3s ease-out;
+                    min-width: 300px;
+                }}
+
+                .toast.success {{
+                    border-left-color: #4CAF50;
+                    color: #2e7d32;
+                }}
+
+                .toast.error {{
+                    border-left-color: #f44336;
+                    color: #c62828;
+                }}
+
+                .toast.warning {{
+                    border-left-color: #ff9800;
+                    color: #ef6c00;
+                }}
+
+                .toast.info {{
+                    border-left-color: #2196F3;
+                    color: #1565c0;
+                }}
+
+                .toast-icon {{
+                    margin-right: 12px;
+                    font-size: 18px;
+                }}
+
+                .toast-content {{
+                    flex: 1;
+                }}
+
+                .toast-close {{
+                    margin-left: 12px;
+                    cursor: pointer;
+                    font-size: 18px;
+                    color: #666;
+                    opacity: 0.7;
+                }}
+
+                .toast-close:hover {{
+                    opacity: 1;
+                }}
+
+                @keyframes slideInRight {{
+                    from {{ transform: translateX(100%); opacity: 0; }}
+                    to {{ transform: translateX(0); opacity: 1; }}
+                }}
+
+                @keyframes slideOutRight {{
+                    from {{ transform: translateX(0); opacity: 1; }}
+                    to {{ transform: translateX(100%); opacity: 0; }}
+                }}
             </style>
         </head>
         <body>
+            <div id="toast-container" class="toast-container"></div>
+            
             <div id="status" class="status disconnected">
                 Disconnected
             </div>
+
 
             <div class="controls">
                 <button id="connectBtn" onclick="connect()">Connect</button>
@@ -410,6 +501,48 @@ def main():
                     }}
                 }}
 
+                function showToast(message, type = 'info', duration = 4000) {{
+                    const toastContainer = document.getElementById('toast-container');
+                    const toast = document.createElement('div');
+                    toast.className = `toast ${{type}}`;
+                    
+                    // Get icon based on type
+                    let icon = 'ℹ️';
+                    if (type === 'success') icon = '✅';
+                    else if (type === 'error') icon = '❌';
+                    else if (type === 'warning') icon = '⚠️';
+                    else if (type === 'info') icon = 'ℹ️';
+                    
+                    toast.innerHTML = `
+                        <span class="toast-icon">${{icon}}</span>
+                        <span class="toast-content">${{message}}</span>
+                        <span class="toast-close" onclick="removeToast(this.parentElement)">×</span>
+                    `;
+                    
+                    toastContainer.appendChild(toast);
+                    
+                    // Auto remove after duration
+                    setTimeout(() => {{
+                        removeToast(toast);
+                    }}, duration);
+                }}
+
+                function removeToast(toast) {{
+                    if (toast && toast.parentNode) {{
+                        toast.style.animation = 'slideOutRight 0.3s ease-in';
+                        setTimeout(() => {{
+                            if (toast.parentNode) {{
+                                toast.parentNode.removeChild(toast);
+                            }}
+                        }}, 300);
+                    }}
+                }}
+
+                function triggerStreamlitToast(message, type) {{
+                    // Show toast notification within the HTML component
+                    showToast(message, type);
+                }}
+
                 function connect() {{
                     if (ws && ws.readyState === WebSocket.OPEN) {{
                         log('Already connected', 'warning');
@@ -433,6 +566,8 @@ def main():
                             updateStatus('Connected', 'connected');
                             document.getElementById('connectBtn').disabled = true;
                             document.getElementById('disconnectBtn').disabled = false;
+                            // Trigger Streamlit toast for connection
+                            triggerStreamlitToast('✅ WebSocket Connected!', 'success');
                         }};
 
                         ws.onmessage = async (event) => {{
@@ -453,6 +588,20 @@ def main():
                                 try {{
                                     const data = JSON.parse(event.data);
                                     log(`Received: ${{JSON.stringify(data, null, 2)}}`, 'success');
+                                    
+                                    // Handle different message types
+                                    if (data.type === 'exit_detected') {{
+                                        log(`🚨 QR CODE DETECTED: ${{data.message}}`, 'error');
+                                        triggerStreamlitToast('🚨 Exit QR Code Detected! Connection will be closed.', 'error');
+                                    }} else if (data.type === 'detection') {{
+                                        // Handle QR codes only (no person count toasts)
+                                        if (data.qr_codes && data.qr_codes.length > 0) {{
+                                            log(`QR codes detected: ${{data.qr_codes.join(', ')}}`, 'warning');
+                                            triggerStreamlitToast('🔍 QR Code Detected!', 'info');
+                                        }}
+                                    }} else if (data.type === 'connection') {{
+                                        triggerStreamlitToast('🔗 Connection established', 'success');
+                                    }}
                                 }} catch (e) {{
                                     log(`Received text: ${{event.data}}`, 'info');
                                 }}
@@ -469,6 +618,8 @@ def main():
                             document.getElementById('connectBtn').disabled = false;
                             document.getElementById('disconnectBtn').disabled = true;
                             ws = null;
+                            // Trigger Streamlit toast for disconnection
+                            triggerStreamlitToast('❌ WebSocket Disconnected!', 'warning');
                         }};
                     }} catch (error) {{
                         log(`Connection error: ${{error.message}}`, 'error');
@@ -481,6 +632,7 @@ def main():
                         stopStreaming();
                         ws.close();
                         log('Disconnecting...', 'info');
+                        triggerStreamlitToast('🔌 Disconnecting...', 'info');
                     }}
                 }}
 
@@ -513,8 +665,10 @@ def main():
                         }});
                         document.getElementById('localVideo').srcObject = localStream;
                         log('Camera started', 'success');
+                        triggerStreamlitToast('📹 Camera Started', 'success');
                     }} catch (error) {{
                         log(`Camera error: ${{error.message}}`, 'error');
+                        triggerStreamlitToast('❌ Camera Failed to Start', 'error');
                     }}
                 }}
 
@@ -524,6 +678,7 @@ def main():
                         document.getElementById('localVideo').srcObject = null;
                         localStream = null;
                         log('Camera stopped', 'info');
+                        triggerStreamlitToast('📹 Camera Stopped', 'warning');
                     }}
                 }}
 
@@ -531,6 +686,7 @@ def main():
                     const video = document.getElementById('localVideo');
                     if (!video.srcObject) {{
                         log('No camera stream available', 'error');
+                        triggerStreamlitToast('❌ No Camera Stream Available', 'error');
                         return null;
                     }}
 
@@ -550,22 +706,26 @@ def main():
                 async function startStreaming() {{
                     if (!ws || ws.readyState !== WebSocket.OPEN) {{
                         log('Not connected', 'error');
+                        triggerStreamlitToast('❌ Not Connected - Cannot Start Streaming', 'error');
                         return;
                     }}
 
                     if (!localStream) {{
                         log('Camera not started', 'error');
+                        triggerStreamlitToast('❌ Camera Not Started - Cannot Stream', 'error');
                         return;
                     }}
 
                     if (streamingInterval) {{
                         log('Already streaming', 'warning');
+                        triggerStreamlitToast('⚠️ Already Streaming', 'warning');
                         return;
                     }}
 
                     const interval = 1000 / TARGET_FPS;
 
                     log(`Started streaming at ${{TARGET_FPS}} FPS`, 'success');
+                    triggerStreamlitToast(`🎥 Streaming Started at ${{TARGET_FPS}} FPS`, 'success');
 
                     streamingInterval = setInterval(async () => {{
                         const frame = await captureFrame();
@@ -583,6 +743,7 @@ def main():
                         clearInterval(streamingInterval);
                         streamingInterval = null;
                         log('Stopped streaming', 'info');
+                        triggerStreamlitToast('🎥 Streaming Stopped', 'warning');
                     }}
                 }}
 
@@ -625,7 +786,8 @@ def main():
         
         6. **Monitor**: Check the stats for frames sent/received and current FPS
         
-        7. **Test Actions**: Use "Send Ping" and "Request Status" to test JSON message communication
+        7. **Test QR Detection**: Show a QR code to test detection (toast notifications will appear)
+        8. **Test Actions**: Use "Send Ping" and "Request Status" to test JSON message communication
         
         **Note**: Your session will remain active until you logout or the token expires.
         """)
@@ -644,6 +806,7 @@ def main():
             - **Text Messages**: Control messages (ping, status) are sent as JSON
             - **Bidirectional**: Server can send frames back to the client
             - **Heartbeat**: Server sends periodic heartbeat messages to keep connection alive
+            - **QR Detection**: Server automatically detects QR codes and shows toast notifications in the interface
             
             ### Performance Tips
             - Lower FPS for slower networks
@@ -656,6 +819,7 @@ def main():
             - **Connection Failed**: Verify the backend server is running
             - **Camera Not Working**: Check browser permissions for camera access
             - **No Frames Received**: Check server logs for errors
+            - **QR Code Not Detected**: Ensure QR code is clear and well-lit, QR detection is enabled by default
             """)
 
 if __name__ == "__main__":

@@ -119,7 +119,7 @@ class FrameProcessor:
             logger.error(f"Failed to encode frame: {e}")
             return None
     
-    def detect_qr_codes(self, frame: np.ndarray) -> Tuple[np.ndarray, List[str]]:
+    def detect_qr_codes(self, frame: np.ndarray) -> Tuple[np.ndarray, List[str], bool]:
         """
         Detect QR codes in the frame.
         
@@ -127,7 +127,10 @@ class FrameProcessor:
             frame: Input frame from camera
             
         Returns:
-            tuple: (frame_with_qr_detections, qr_data_list)
+            tuple: (frame_with_qr_detections, qr_data_list, has_exit_qr)
+                - frame_with_qr_detections: Annotated frame with QR code detections
+                - qr_data_list: List of detected QR code data
+                - has_exit_qr: True if any QR code contains "exit" value
         """
         # Convert frame to grayscale for QR code detection
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
@@ -136,6 +139,7 @@ class FrameProcessor:
         qr_codes = pyzbar.decode(gray)
         
         qr_data_list = []
+        has_exit_qr = False
         annotated_frame = frame.copy()
         
         for qr_code in qr_codes:
@@ -143,18 +147,24 @@ class FrameProcessor:
             qr_data = qr_code.data.decode('utf-8')
             qr_data_list.append(qr_data)
             
+            # Check if QR code contains "exit" value
+            if qr_data.lower().strip() == "exit":
+                has_exit_qr = True
+                logger.info("Exit QR code detected - connection will be terminated")
+            
             # Get QR code location
             rect = qr_code.rect
             x, y, w, h = rect.left, rect.top, rect.width, rect.height
             
-            # Draw rectangle around QR code
-            cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), (255, 0, 0), 2)
+            # Draw rectangle around QR code (red for exit, blue for others)
+            color = (0, 0, 255) if qr_data.lower().strip() == "exit" else (255, 0, 0)
+            cv2.rectangle(annotated_frame, (x, y), (x + w, y + h), color, 2)
             
             # Draw QR code data as text
             cv2.putText(annotated_frame, qr_data, (x, y - 10), 
-                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 0, 0), 1)
+                       cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
         
-        return annotated_frame, qr_data_list
+        return annotated_frame, qr_data_list, has_exit_qr
 
     def calculate_iou(self, bbox1: Tuple[int, int, int, int], bbox2: Tuple[int, int, int, int]) -> float:
         """
@@ -487,8 +497,9 @@ class FrameProcessor:
             
             # Process QR codes if enabled
             qr_data_list = []
+            has_exit_qr = False
             if self.enable_qr:
-                frame, qr_data_list = self.detect_qr_codes(frame)
+                frame, qr_data_list, has_exit_qr = self.detect_qr_codes(frame)
             
             # Detect persons
             annotated_frame, person_count, detections_info = self.detect_persons(frame)
@@ -520,6 +531,7 @@ class FrameProcessor:
                 "detections": detections_info,
                 "avg_confidence": avg_confidence,
                 "qr_codes": qr_data_list if self.enable_qr else [],
+                "has_exit_qr": has_exit_qr,
                 "frames_processed": self.frames_processed,
                 "saved_to_db": saved_count
             }
