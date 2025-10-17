@@ -161,6 +161,7 @@ def main():
         # Connection Settings
         st.header("Connection Settings")
         
+        
         # Streaming Settings
         st.subheader("Streaming Settings")
         fps = st.slider("Streaming FPS:", min_value=1, max_value=10, value=5)
@@ -292,6 +293,7 @@ def main():
                     margin-top: 5px;
                 }}
 
+
                 #log {{
                     background-color: #1e1e1e;
                     color: #d4d4d4;
@@ -309,12 +311,23 @@ def main():
                     color: #333;
                     margin-top: 0;
                 }}
+
+                @keyframes slideIn {{
+                    from {{ transform: translateX(100%); opacity: 0; }}
+                    to {{ transform: translateX(0); opacity: 1; }}
+                }}
+
+                @keyframes slideOut {{
+                    from {{ transform: translateX(0); opacity: 1; }}
+                    to {{ transform: translateX(100%); opacity: 0; }}
+                }}
             </style>
         </head>
         <body>
             <div id="status" class="status disconnected">
                 Disconnected
             </div>
+
 
             <div class="controls">
                 <button id="connectBtn" onclick="connect()">Connect</button>
@@ -410,6 +423,36 @@ def main():
                     }}
                 }}
 
+                function showQRNotification(message, type) {{
+                    // Create a simple notification
+                    const notification = document.createElement('div');
+                    notification.style.cssText = `
+                        position: fixed;
+                        top: 20px;
+                        right: 20px;
+                        background: ${{type === 'error' ? '#f44336' : '#4CAF50'}};
+                        color: white;
+                        padding: 15px 20px;
+                        border-radius: 5px;
+                        font-weight: bold;
+                        z-index: 1000;
+                        box-shadow: 0 4px 8px rgba(0,0,0,0.3);
+                        animation: slideIn 0.3s ease-out;
+                    `;
+                    notification.textContent = message;
+                    document.body.appendChild(notification);
+                    
+                    // Remove after 3 seconds
+                    setTimeout(() => {{
+                        notification.style.animation = 'slideOut 0.3s ease-in';
+                        setTimeout(() => {{
+                            if (notification.parentNode) {{
+                                notification.parentNode.removeChild(notification);
+                            }}
+                        }}, 300);
+                    }}, 3000);
+                }}
+
                 function connect() {{
                     if (ws && ws.readyState === WebSocket.OPEN) {{
                         log('Already connected', 'warning');
@@ -453,6 +496,17 @@ def main():
                                 try {{
                                     const data = JSON.parse(event.data);
                                     log(`Received: ${{JSON.stringify(data, null, 2)}}`, 'success');
+                                    
+                                    // Handle QR code detection
+                                    if (data.type === 'exit_detected') {{
+                                        log(`🚨 QR CODE DETECTED: ${{data.message}}`, 'error');
+                                        // Show visual notification
+                                        showQRNotification('🚨 Exit QR Code Detected! Connection will be closed.', 'error');
+                                    }} else if (data.type === 'detection' && data.qr_codes && data.qr_codes.length > 0) {{
+                                        log(`QR codes detected: ${{data.qr_codes.join(', ')}}`, 'warning');
+                                        // Show visual notification
+                                        showQRNotification('🔍 QR Code Detected!', 'success');
+                                    }}
                                 }} catch (e) {{
                                     log(`Received text: ${{event.data}}`, 'info');
                                 }}
@@ -625,7 +679,9 @@ def main():
         
         6. **Monitor**: Check the stats for frames sent/received and current FPS
         
-        7. **Test Actions**: Use "Send Ping" and "Request Status" to test JSON message communication
+        7. **Test QR Detection**: Show a QR code to test detection (toast notifications will appear)
+        
+        8. **Test Actions**: Use "Send Ping" and "Request Status" to test JSON message communication
         
         **Note**: Your session will remain active until you logout or the token expires.
         """)
@@ -644,6 +700,7 @@ def main():
             - **Text Messages**: Control messages (ping, status) are sent as JSON
             - **Bidirectional**: Server can send frames back to the client
             - **Heartbeat**: Server sends periodic heartbeat messages to keep connection alive
+            - **QR Detection**: Server automatically detects QR codes and shows toast notifications
             
             ### Performance Tips
             - Lower FPS for slower networks
@@ -656,6 +713,7 @@ def main():
             - **Connection Failed**: Verify the backend server is running
             - **Camera Not Working**: Check browser permissions for camera access
             - **No Frames Received**: Check server logs for errors
+            - **QR Code Not Detected**: Ensure QR code is clear and well-lit, QR detection is enabled by default
             """)
 
 if __name__ == "__main__":
