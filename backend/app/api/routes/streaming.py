@@ -30,6 +30,7 @@ async def video_stream_endpoint(
         - Detection confidence scores
         - Frame statistics and monitoring
         - Automatic database persistence (every 5 seconds per tracked person)
+        - QR code detection with exit functionality (when enabled)
     
     Clients can send video frames to be processed or broadcasted, and receive
     processed frames with person detection annotations from the server.
@@ -52,6 +53,8 @@ async def video_stream_endpoint(
         - Binary: Processed video frames with person detection annotations
         - JSON: Detection results when persons are detected
           - {"type": "detection", "person_count": N, "avg_confidence": X, "detections": [...], "saved_to_db": N}
+        - JSON: Exit QR code detection
+          - {"type": "exit_detected", "message": "Exit QR code detected - connection will be closed"}
           
     Example usage from JavaScript client:
         ```javascript
@@ -91,7 +94,7 @@ async def video_stream_endpoint(
     # Detection configuration (per-client settings)
     detection_config = {
         "confidence_threshold": 0.5,
-        "enable_qr": False
+        "enable_qr": True
     }
     
     # Get database session for detection persistence
@@ -131,6 +134,17 @@ async def video_stream_endpoint(
                         enable_qr=detection_config["enable_qr"]
                     )
                     processed_frame, results = await processor.process_frame(frame_data, session=session)
+                    
+                    # Check for exit QR code
+                    if results.get("has_exit_qr", False):
+                        logger.info(f"Exit QR code detected for client {client_id} - terminating connection")
+                        await websocket.send_json({
+                            "type": "exit_detected",
+                            "message": "Exit QR code detected - connection will be closed"
+                        })
+                        # Close the connection gracefully
+                        await websocket.close(code=1000, reason="Exit QR code detected")
+                        break
                     
                     if processed_frame:
                         # Send processed frame with detection annotations back to client
